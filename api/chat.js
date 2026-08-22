@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { bot, fundiFileText, messages } = req.body
+    const { bot, clientInstructions, fundiFileText, messages } = req.body
 
     const basePrompt =
       bot === 'poppie'
@@ -14,7 +14,12 @@ export default async function handler(req, res) {
           : ''
 
     const systemPrompt =
-      'CLIENT FUNDI.FILE:\n' + fundiFileText + '\n\n---\n\n' + basePrompt
+      'CLIENT FUNDI.FILE:\n' +
+      fundiFileText +
+      '\n\n---\n\nCLIENT-SPECIFIC INSTRUCTIONS FOR THIS BOT:\n' +
+      (clientInstructions || '') +
+      '\n\n---\n\n' +
+      basePrompt
 
     const openaiResponse = await fetch(
       'https://api.openai.com/v1/chat/completions',

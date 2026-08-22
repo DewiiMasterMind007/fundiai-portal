@@ -1,18 +1,9 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
-
-const AGENTS = {
-  poppie: {
-    name: 'Poppie',
-    role: 'Social Media Fundi',
-    image: '/Poppie.png',
-  },
-  chad: {
-    name: 'Chad',
-    role: 'Website & SEO Fundi',
-    image: '/Chad.png',
-  },
-}
+import { useClient } from '../context/ClientContext'
+import { supabase } from '../lib/supabase'
+import { BOTS } from '../lib/bots'
 
 const ROSTER = [
   { name: 'Bakkies', role: 'Customer Support' },
@@ -24,9 +15,9 @@ const ROSTER = [
 ]
 
 const SLOTS = [
-  { agentKey: 'poppie' },
+  { botId: 'poppie' },
   ROSTER[0],
-  { agentKey: 'chad' },
+  { botId: 'chad' },
   ROSTER[1],
   ROSTER[2],
   ROSTER[3],
@@ -35,7 +26,35 @@ const SLOTS = [
 ]
 
 export default function Home() {
+  const { client } = useClient()
   const navigate = useNavigate()
+
+  const [activeBotIds, setActiveBotIds] = useState([])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchClientBots() {
+      const { data, error } = await supabase
+        .from('client_bots')
+        .select('*')
+        .eq('client_email', client.email)
+
+      if (cancelled) return
+      if (error) {
+        console.error('Failed to load client bots:', error.message)
+        setActiveBotIds([])
+        return
+      }
+      setActiveBotIds((data ?? []).map((row) => row.bot))
+    }
+
+    fetchClientBots()
+
+    return () => {
+      cancelled = true
+    }
+  }, [client.email])
 
   return (
     <div className="flex h-full flex-col gap-8 overflow-y-auto font-sans">
@@ -71,17 +90,25 @@ export default function Home() {
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {SLOTS.map((slot, i) =>
-            slot.agentKey ? (
-              <ActiveAgentCard
-                key={slot.agentKey}
-                agent={AGENTS[slot.agentKey]}
-                onClick={() => navigate('/chat')}
-              />
-            ) : (
-              <LockedAgentCard key={slot.name ?? i} name={slot.name} role={slot.role} />
-            ),
-          )}
+          {SLOTS.map((slot, i) => {
+            if (!slot.botId) {
+              return <LockedAgentCard key={slot.name ?? i} name={slot.name} role={slot.role} />
+            }
+
+            const info = BOTS[slot.botId]
+            if (activeBotIds.includes(slot.botId)) {
+              return (
+                <ActiveAgentCard
+                  key={slot.botId}
+                  agent={info}
+                  onClick={() => navigate(`/chat/${slot.botId}`)}
+                />
+              )
+            }
+            return (
+              <LockedAgentCard key={slot.botId} name={info.name} role={info.role} />
+            )
+          })}
         </div>
       </div>
     </div>

@@ -4,13 +4,9 @@ import { format } from 'date-fns'
 import { Bell, RefreshCw } from 'lucide-react'
 import { useClient } from '../context/ClientContext'
 import { supabase } from '../lib/supabase'
+import { BOTS } from '../lib/bots'
 
-const BOT_COPY = {
-  poppie: { name: 'Poppie', role: 'Social Media Fundi' },
-  chad: { name: 'Chad', role: 'Website & SEO Fundi' },
-}
-
-const DECORATIVE_SLOTS = 5
+const TOTAL_AVATAR_SLOTS = 6
 
 function BotAvatar({ botName }) {
   return (
@@ -25,17 +21,55 @@ export default function Notifications() {
   const location = useLocation()
   const navigate = useNavigate()
 
-  const bot = BOT_COPY[client.bot_assigned] ?? { name: 'Fundi', role: 'Your AI Assistant' }
-
+  const [activeBotIds, setActiveBotIds] = useState([])
+  const [unreadCounts, setUnreadCounts] = useState({})
+  const [selectedBotId, setSelectedBotId] = useState(null)
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [selected, setSelected] = useState(false)
   const [unreadDividerId, setUnreadDividerId] = useState(null)
 
   const fetchTokenRef = useRef(0)
 
-  async function fetchNotifications() {
+  async function fetchActiveBotsAndCounts() {
+    const { data: botsData, error: botsError } = await supabase
+      .from('client_bots')
+      .select('bot')
+      .eq('client_email', client.email)
+
+    if (botsError) {
+      setError(botsError.message)
+      return
+    }
+
+    const botIds = (botsData ?? []).map((row) => row.bot)
+    setActiveBotIds(botIds)
+
+    if (botIds.length === 0) {
+      setUnreadCounts({})
+      return
+    }
+
+    const { data: unreadData, error: unreadError } = await supabase
+      .from('notifications')
+      .select('bot')
+      .eq('client_email', client.email)
+      .eq('is_read', false)
+      .in('bot', botIds)
+
+    if (unreadError) {
+      console.error('Failed to fetch unread counts:', unreadError.message)
+      return
+    }
+
+    const counts = {}
+    for (const row of unreadData ?? []) {
+      counts[row.bot] = (counts[row.bot] ?? 0) + 1
+    }
+    setUnreadCounts(counts)
+  }
+
+  async function fetchNotifications(botId) {
     const token = ++fetchTokenRef.current
     setLoading(true)
     setError(null)
@@ -45,16 +79,19 @@ export default function Notifications() {
         .from('notifications')
         .select('*')
         .eq('client_email', client.email)
-        .eq('bot', client.bot_assigned)
+        .eq('bot', botId)
         .order('created_at', { ascending: true })
 
-      if (fetchTokenRef.current !== token) return
+      if (fetchTokenRef.current !== token) return []
       if (fetchError) throw new Error(fetchError.message)
 
-      setNotifications(data ?? [])
+      const rows = data ?? []
+      setNotifications(rows)
+      return rows
     } catch (err) {
-      if (fetchTokenRef.current !== token) return
+      if (fetchTokenRef.current !== token) return []
       setError(err.message)
+      return []
     } finally {
       if (fetchTokenRef.current === token) setLoading(false)
     }
@@ -62,25 +99,25 @@ export default function Notifications() {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchNotifications()
+    fetchActiveBotsAndCounts()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client.email, client.bot_assigned, location.pathname])
+  }, [client.email, location.pathname])
 
-  const unreadCount = notifications.filter((n) => !n.is_read).length
+  async function handleSelectBot(botId) {
+    setSelectedBotId(botId)
+    setUnreadDividerId(null)
 
-  async function handleSelectBot() {
-    setSelected(true)
+    const rows = await fetchNotifications(botId)
 
-    const firstUnread = notifications.find((n) => !n.is_read)
+    const firstUnread = rows.find((n) => !n.is_read)
     setUnreadDividerId(firstUnread?.id ?? null)
-
     if (!firstUnread) return
 
     const { error: updateError } = await supabase
       .from('notifications')
       .update({ is_read: true })
       .eq('client_email', client.email)
-      .eq('bot', client.bot_assigned)
+      .eq('bot', botId)
       .eq('is_read', false)
 
     if (updateError) {
@@ -88,10 +125,17 @@ export default function Notifications() {
       return
     }
 
-    // Reflect locally right away so the badge drops to 0 immediately,
-    // without waiting on a route change to re-trigger the fetch effect.
+    // Reflect locally right away so the badge drops to 0 immediately.
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
-    fetchNotifications()
+    setUnreadCounts((prev) => ({ ...prev, [botId]: 0 }))
+  }
+
+  function handleRefresh() {
+    if (selectedBotId) {
+      fetchNotifications(selectedBotId)
+    } else {
+      fetchActiveBotsAndCounts()
+    }
   }
 
   function handleReviewClick(link) {
@@ -102,6 +146,11 @@ export default function Notifications() {
     }
   }
 
+  const selectedBot = selectedBotId
+    ? (BOTS[selectedBotId] ?? { name: 'Fundi', role: 'Your AI Assistant' })
+    : null
+  const decorativeCount = Math.max(0, TOTAL_AVATAR_SLOTS - activeBotIds.length)
+
   return (
     <div className="flex h-full gap-6 font-sans">
       <div
@@ -111,23 +160,30 @@ export default function Notifications() {
         <h1 className="text-lg font-bold text-white">Fundi's DM</h1>
 
         <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={handleSelectBot}
-            aria-label={bot.name}
-            className={`relative flex h-14 w-14 items-center justify-center rounded-full bg-white text-lg font-bold text-fundi-dark transition ${
-              selected ? 'ring-4 ring-fundi-green' : 'hover:opacity-90'
-            }`}
-          >
-            {bot.name.charAt(0)}
-            {unreadCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-semibold text-white">
-                {unreadCount}
-              </span>
-            )}
-          </button>
+          {activeBotIds.map((botId) => {
+            const info = BOTS[botId] ?? { name: 'Fundi' }
+            const count = unreadCounts[botId] ?? 0
+            return (
+              <button
+                key={botId}
+                type="button"
+                onClick={() => handleSelectBot(botId)}
+                aria-label={info.name}
+                className={`relative flex h-14 w-14 items-center justify-center rounded-full bg-white text-lg font-bold text-fundi-dark transition ${
+                  selectedBotId === botId ? 'ring-4 ring-fundi-green' : 'hover:opacity-90'
+                }`}
+              >
+                {info.name.charAt(0)}
+                {count > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-semibold text-white">
+                    {count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
 
-          {Array.from({ length: DECORATIVE_SLOTS }).map((_, i) => (
+          {Array.from({ length: decorativeCount }).map((_, i) => (
             <div
               key={i}
               aria-hidden="true"
@@ -140,18 +196,18 @@ export default function Notifications() {
       <div className="flex h-full flex-1 flex-col overflow-hidden">
         <div className="mb-2 flex items-center justify-between">
           <div>
-            {selected && (
+            {selectedBot && (
               <>
                 <h2 className="text-lg font-semibold text-fundi-dark">
-                  {bot.name}
+                  {selectedBot.name}
                 </h2>
-                <p className="text-xs text-gray-500">{bot.role}</p>
+                <p className="text-xs text-gray-500">{selectedBot.role}</p>
               </>
             )}
           </div>
           <button
             type="button"
-            onClick={fetchNotifications}
+            onClick={handleRefresh}
             aria-label="Refresh"
             className="flex h-8 w-8 items-center justify-center rounded-full text-fundi-dark transition hover:bg-fundi-bg"
           >
@@ -164,7 +220,7 @@ export default function Notifications() {
             <div className="rounded-xl bg-red-50 p-4 text-sm text-red-600">
               {error}
             </div>
-          ) : !selected ? (
+          ) : !selectedBotId ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
               <Bell size={32} className="text-fundi-blue" />
               <p className="text-fundi-dark">Select a Fundi to check messages</p>
@@ -195,7 +251,7 @@ export default function Notifications() {
                   )}
 
                   <div className="flex items-start gap-2">
-                    <BotAvatar botName={bot.name} />
+                    <BotAvatar botName={selectedBot.name} />
                     <div
                       className="max-w-md rounded-2xl rounded-bl-sm px-4 py-2 text-white"
                       style={{ background: 'var(--fundi-gradient)' }}

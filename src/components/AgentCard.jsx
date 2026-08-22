@@ -1,12 +1,8 @@
 import { Info } from 'lucide-react'
+import { BOTS } from '../lib/bots'
 
-const AGENT_COPY = {
-  poppie: { name: 'Poppie', role: 'Social Media Fundi', image: '/Poppie.png' },
-  chad: { name: 'Chad', role: 'Website & SEO Fundi', image: '/Chad.png' },
-}
-
-export default function AgentCard({ botAssigned }) {
-  const agent = AGENT_COPY[botAssigned] ?? {
+export default function AgentCard({ bot }) {
+  const agent = BOTS[bot] ?? {
     name: 'Fundi',
     role: 'Your AI Assistant',
     image: null,

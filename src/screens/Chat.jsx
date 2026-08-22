@@ -1,17 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { formatDistanceToNowStrict } from 'date-fns'
 import { Paperclip, Send, Calendar, BarChart2 } from 'lucide-react'
 import { useClient } from '../context/ClientContext'
 import { supabase } from '../lib/supabase'
+import { BOTS } from '../lib/bots'
 import AgentCard from '../components/AgentCard'
 
 const TICKET_MARKER = '[FIRE_TICKET]'
-
-const BOT_LABEL = {
-  poppie: 'Poppie',
-  chad: 'Chad',
-}
 
 function deriveTitle(text) {
   const words = text.trim().split(/\s+/).slice(0, 5)
@@ -25,7 +21,9 @@ function makeLocalId() {
 export default function Chat() {
   const { client, fundiFileText } = useClient()
   const navigate = useNavigate()
+  const { botId } = useParams()
 
+  const [clientInstructions, setClientInstructions] = useState('')
   const [sessions, setSessions] = useState([])
   const [sessionsError, setSessionsError] = useState(null)
   const [selectedSessionId, setSelectedSessionId] = useState(null)
@@ -43,6 +41,7 @@ export default function Chat() {
       .from('chat_sessions')
       .select('*')
       .eq('client_email', client.email)
+      .eq('bot', botId)
       .order('updated_at', { ascending: false })
 
     if (error) {
@@ -141,7 +140,7 @@ export default function Chat() {
       .from('chat_sessions')
       .insert({
         client_email: client.email,
-        bot: client.bot_assigned,
+        bot: botId,
         title: 'New Chat',
       })
       .select()
@@ -168,7 +167,8 @@ export default function Chat() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        bot: client.bot_assigned,
+        bot: botId,
+        clientInstructions,
         fundiFileText,
         messages: apiMessages,
       }),
@@ -216,7 +216,7 @@ export default function Chat() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               client_email: client.email,
-              bot: client.bot_assigned,
+              bot: botId,
               summary: ticketSummary,
             }),
           })
@@ -309,10 +309,41 @@ export default function Chat() {
   }, [selectedSessionId])
 
   useEffect(() => {
+    let cancelled = false
+
+    async function loadInstructions() {
+      const { data, error } = await supabase
+        .from('client_bots')
+        .select('instructions')
+        .eq('client_email', client.email)
+        .eq('bot', botId)
+        .maybeSingle()
+
+      if (cancelled) return
+      if (error) {
+        console.error('Failed to load bot instructions:', error.message)
+        setClientInstructions('')
+        return
+      }
+      setClientInstructions(data?.instructions ?? '')
+    }
+
+    loadInstructions()
+
+    return () => {
+      cancelled = true
+    }
+  }, [client.email, botId])
+
+  useEffect(() => {
+    // Switching bots means a completely different session list — clear
+    // the previous bot's selection before loading the new one's.
     // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedSessionId(null)
+    setMessages([])
     fetchSessions()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client.email])
+  }, [client.email, botId])
 
   useEffect(() => {
     let cancelled = false
@@ -347,7 +378,7 @@ export default function Chat() {
   return (
     <div className="flex h-full gap-6 overflow-hidden font-sans">
       <div className="flex h-full w-72 flex-shrink-0 flex-col gap-4">
-        <AgentCard botAssigned={client.bot_assigned} />
+        <AgentCard bot={botId} />
 
         <h2 className="text-sm font-semibold text-fundi-dark/70">
           Recent Chats
@@ -437,15 +468,9 @@ export default function Chat() {
                 </p>
               )}
               {messages.map((message) => (
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  botAssigned={client.bot_assigned}
-                />
+                <MessageBubble key={message.id} message={message} bot={botId} />
               ))}
-              {isSending && (
-                <TypingIndicatorRow botAssigned={client.bot_assigned} />
-              )}
+              {isSending && <TypingIndicatorRow bot={botId} />}
               <div ref={messagesEndRef} />
             </div>
             <div className="mx-auto w-full max-w-2xl px-2 pb-2">
@@ -463,8 +488,8 @@ export default function Chat() {
   )
 }
 
-function BotAvatar({ botAssigned }) {
-  const label = BOT_LABEL[botAssigned] ?? 'F'
+function BotAvatar({ bot }) {
+  const label = BOTS[bot]?.name ?? 'F'
   return (
     <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-fundi-dark text-xs font-semibold text-white">
       {label.charAt(0)}
@@ -472,7 +497,7 @@ function BotAvatar({ botAssigned }) {
   )
 }
 
-function MessageBubble({ message, botAssigned }) {
+function MessageBubble({ message, bot }) {
   if (message.role === 'system') {
     const isError = message.kind === 'system-error'
     return (
@@ -502,7 +527,7 @@ function MessageBubble({ message, botAssigned }) {
 
   return (
     <div className="flex items-end justify-start gap-2">
-      <BotAvatar botAssigned={botAssigned} />
+      <BotAvatar bot={bot} />
       <div className="max-w-md rounded-2xl rounded-bl-sm bg-gradient-to-br from-fundi-blue to-fundi-dark px-4 py-2 text-white">
         {message.content}
       </div>
@@ -510,10 +535,10 @@ function MessageBubble({ message, botAssigned }) {
   )
 }
 
-function TypingIndicatorRow({ botAssigned }) {
+function TypingIndicatorRow({ bot }) {
   return (
     <div className="flex items-end justify-start gap-2">
-      <BotAvatar botAssigned={botAssigned} />
+      <BotAvatar bot={bot} />
       <div className="flex w-fit items-center gap-1 rounded-2xl rounded-bl-sm bg-gradient-to-br from-fundi-blue to-fundi-dark px-4 py-3">
         <span className="h-2 w-2 animate-bounce rounded-full bg-white [animation-delay:-0.3s]" />
         <span className="h-2 w-2 animate-bounce rounded-full bg-white [animation-delay:-0.15s]" />

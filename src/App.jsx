@@ -16,6 +16,11 @@ import ScheduleReviewLink from './screens/ScheduleReviewLink'
 
 const SESSION_EXPIRED_REDIRECT_DELAY_MS = 1500
 
+function ChatIndexRedirect() {
+  const { client } = useClient()
+  return <Navigate to={`/chat/${client.bot_assigned}`} replace />
+}
+
 function AppShell() {
   const { session, error, loading } = useClient()
   const [redirectToLogin, setRedirectToLogin] = useState(false)
@@ -100,7 +105,8 @@ function App() {
             />
             <Route path="/" element={<AppShell />}>
               <Route index element={<Home />} />
-              <Route path="chat" element={<Chat />} />
+              <Route path="chat" element={<ChatIndexRedirect />} />
+              <Route path="chat/:botId" element={<Chat />} />
               <Route path="workspace" element={<Workspace />} />
               <Route path="notifications" element={<Notifications />} />
               <Route path="schedule" element={<Schedule />} />
