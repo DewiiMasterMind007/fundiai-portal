@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { formatDistanceToNowStrict } from 'date-fns'
-import { Paperclip, Send } from 'lucide-react'
+import { Paperclip, Send, Calendar, BarChart2 } from 'lucide-react'
 import { useClient } from '../context/ClientContext'
 import { supabase } from '../lib/supabase'
 import AgentCard from '../components/AgentCard'
@@ -23,6 +24,7 @@ function makeLocalId() {
 
 export default function Chat() {
   const { client, fundiFileText } = useClient()
+  const navigate = useNavigate()
 
   const [sessions, setSessions] = useState([])
   const [sessionsError, setSessionsError] = useState(null)
@@ -379,6 +381,27 @@ export default function Chat() {
               </p>
             </button>
           ))}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/schedule')}
+            aria-label="Content schedule"
+            className="flex aspect-square items-center justify-center rounded-2xl border-2 border-fundi-blue bg-white text-fundi-blue transition hover:bg-fundi-bg"
+          >
+            <Calendar size={22} />
+          </button>
+          <button
+            type="button"
+            disabled
+            aria-label="Insights (coming soon)"
+            title="Coming soon"
+            className="flex aspect-square items-center justify-center rounded-2xl border-2 border-gray-200 bg-white text-gray-300"
+            style={{ cursor: 'not-allowed' }}
+          >
+            <BarChart2 size={22} />
+          </button>
         </div>
 
         <button
