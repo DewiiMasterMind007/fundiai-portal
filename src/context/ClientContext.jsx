@@ -1,7 +1,12 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { SETTING_PASSWORD_FLAG_KEY } from '../lib/authRecovery'
 
 const ClientContext = createContext(undefined)
+
+function isSettingPassword() {
+  return sessionStorage.getItem(SETTING_PASSWORD_FLAG_KEY) === 'true'
+}
 
 // Events that hand us a session we should actually (re)load client data
 // for — explicitly includes TOKEN_REFRESHED alongside SIGNED_IN/
@@ -91,6 +96,11 @@ export function ClientProvider({ children }) {
         }
       } catch (err) {
         if (loadTokenRef.current !== token) return
+        if (isSettingPassword()) {
+          // SetPassword started owning this session after this attempt
+          // began — don't sign it out from under that in-progress flow.
+          return
+        }
         console.error('Failed to load client session:', err)
         setClient(null)
         setFundiFileText('')
@@ -107,6 +117,13 @@ export function ClientProvider({ children }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, newSession) => {
+      if (isSettingPassword()) {
+        // SetPassword owns the session right now — skip the entire
+        // client-fetch-and-validate routine for this event and leave it
+        // fully undisturbed.
+        return
+      }
+
       setSession(newSession)
 
       if (!newSession) {

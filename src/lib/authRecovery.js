@@ -1,3 +1,8 @@
+// Set by SetPassword while it owns the auth session, so ClientContext's
+// global listener knows to stay out of the way — see SetPassword.jsx and
+// ClientContext.jsx for the read/write sides of this handshake.
+export const SETTING_PASSWORD_FLAG_KEY = 'fundi_setting_password'
+
 export function detectRecoveryHash() {
   if (typeof window === 'undefined' || !window.location.hash) return false
   const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))

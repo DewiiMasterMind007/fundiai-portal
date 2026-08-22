@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { ClientProvider, useClient } from './context/ClientContext'
 import { supabase } from './lib/supabase'
-import { detectRecoverySignal } from './lib/authRecovery'
+import { detectRecoverySignal, SETTING_PASSWORD_FLAG_KEY } from './lib/authRecovery'
 import Sidebar from './components/Sidebar'
 import Login from './screens/Login'
 import SetPassword from './screens/SetPassword'
@@ -90,10 +90,17 @@ function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Read fresh on every render (not just at mount) — while SetPassword
+  // owns the session, it must keep rendering regardless of whatever
+  // ClientContext's loading/error/session state currently says, so
+  // AppShell's redirect logic never gets a chance to interfere.
+  const isSettingPassword =
+    sessionStorage.getItem(SETTING_PASSWORD_FLAG_KEY) === 'true'
+
   return (
     <BrowserRouter>
       <ClientProvider>
-        {isRecoveryFlow ? (
+        {isRecoveryFlow || isSettingPassword ? (
           <SetPassword />
         ) : (
           <Routes>

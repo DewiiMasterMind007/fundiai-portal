@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { detectRecoverySignal, SETTING_PASSWORD_FLAG_KEY } from '../lib/authRecovery'
 
 export default function SetPassword() {
   const [status, setStatus] = useState('verifying') // 'verifying' | 'ready' | 'invalid'
@@ -11,6 +12,14 @@ export default function SetPassword() {
 
   useEffect(() => {
     let cancelled = false
+
+    // Detect via the code param or hash tokens synchronously, before any
+    // async Supabase call below — ClientContext's global auth listener can
+    // otherwise react to the same auth event first and sign the session
+    // out from under this flow.
+    if (detectRecoverySignal()) {
+      sessionStorage.setItem(SETTING_PASSWORD_FLAG_KEY, 'true')
+    }
 
     async function verify() {
       try {
@@ -43,6 +52,7 @@ export default function SetPassword() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
+        sessionStorage.setItem(SETTING_PASSWORD_FLAG_KEY, 'true')
         verify()
       }
     })
@@ -50,6 +60,9 @@ export default function SetPassword() {
     return () => {
       cancelled = true
       subscription.unsubscribe()
+      // Leaving this screen without finishing (expired link, back button,
+      // etc.) — release ClientContext so it resumes normal auth handling.
+      sessionStorage.removeItem(SETTING_PASSWORD_FLAG_KEY)
     }
   }, [])
 
@@ -72,6 +85,8 @@ export default function SetPassword() {
       setError(updateError.message)
       return
     }
+
+    sessionStorage.removeItem(SETTING_PASSWORD_FLAG_KEY)
 
     // Use a full navigation (not react-router's navigate) so the
     // #type=recovery hash / ?code= query is actually dropped and App
