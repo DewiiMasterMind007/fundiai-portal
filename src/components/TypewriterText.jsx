@@ -2,14 +2,17 @@ import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
-const MIN_CHUNK_CHARS = 15
-const MAX_CHUNK_CHARS = 25
-const TICK_MS = 18
+// ~1-3 chars every 35ms ≈ 57 chars/sec, which reads as a fast human typist
+// (well above the ~40 WPM / ~3 chars-per-sec average) rather than the
+// reply just flashing into existence — a 300-char reply takes ~5s.
+const MIN_CHUNK_CHARS = 1
+const MAX_CHUNK_CHARS = 3
+const TICK_MS = 35
 
-// Reveals `text` progressively in small chunks (not one character at a
-// time — too slow for longer replies) by growing a substring each tick,
-// piped through ReactMarkdown so the revealed portion always renders as
-// real markdown rather than raw syntax. Calls `onDone` once fully revealed.
+// Reveals `text` progressively in small chunks by growing a substring each
+// tick, piped through ReactMarkdown so the revealed portion always renders
+// as real markdown rather than raw syntax. Calls `onDone` once fully
+// revealed.
 export default function TypewriterText({ text, onDone }) {
   const [revealedLength, setRevealedLength] = useState(0)
   const onDoneRef = useRef(onDone)
