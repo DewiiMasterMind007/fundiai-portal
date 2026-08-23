@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Bell, RefreshCw } from 'lucide-react'
 import { useClient } from '../context/ClientContext'
 import { supabase } from '../lib/supabase'
 import { BOTS } from '../lib/bots'
+import { ASSISTANT_MARKDOWN_CLASSES } from '../lib/markdownBubble'
 
 const TOTAL_AVATAR_SLOTS = 6
 
@@ -253,10 +256,12 @@ export default function Notifications() {
                   <div className="flex items-start gap-2">
                     <BotAvatar botName={selectedBot.name} />
                     <div
-                      className="max-w-md rounded-2xl rounded-bl-sm px-4 py-2 text-white"
+                      className={`max-w-md rounded-2xl rounded-bl-sm px-4 py-2 text-white ${ASSISTANT_MARKDOWN_CLASSES}`}
                       style={{ background: 'var(--fundi-gradient)' }}
                     >
-                      {n.message}
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {n.message}
+                      </ReactMarkdown>
                     </div>
                   </div>
 

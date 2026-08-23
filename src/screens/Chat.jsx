@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { formatDistanceToNowStrict } from 'date-fns'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Paperclip, Send, Calendar, BarChart2 } from 'lucide-react'
 import { useClient } from '../context/ClientContext'
 import { supabase } from '../lib/supabase'
 import { BOTS } from '../lib/bots'
+import { ASSISTANT_MARKDOWN_CLASSES } from '../lib/markdownBubble'
 import AgentCard from '../components/AgentCard'
 
 const TICKET_MARKER = '[FIRE_TICKET]'
@@ -528,8 +531,12 @@ function MessageBubble({ message, bot }) {
   return (
     <div className="flex items-end justify-start gap-2">
       <BotAvatar bot={bot} />
-      <div className="max-w-md rounded-2xl rounded-bl-sm bg-gradient-to-br from-fundi-blue to-fundi-dark px-4 py-2 text-white">
-        {message.content}
+      <div
+        className={`max-w-md rounded-2xl rounded-bl-sm bg-gradient-to-br from-fundi-blue to-fundi-dark px-4 py-2 text-white ${ASSISTANT_MARKDOWN_CLASSES}`}
+      >
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {message.content}
+        </ReactMarkdown>
       </div>
     </div>
   )
