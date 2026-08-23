@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase'
 import { BOTS } from '../lib/bots'
 import { ASSISTANT_MARKDOWN_CLASSES } from '../lib/markdownBubble'
 import AgentCard from '../components/AgentCard'
+import TypewriterText from '../components/TypewriterText'
 
 const TICKET_MARKER = '[FIRE_TICKET]'
 
@@ -34,10 +35,15 @@ export default function Chat() {
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [input, setInput] = useState('')
   const [sendingSessionId, setSendingSessionId] = useState(null)
+  const [revealingMessageId, setRevealingMessageId] = useState(null)
 
   const greetedSessionsRef = useRef(new Set())
   const selectedSessionIdRef = useRef(null)
   const messagesEndRef = useRef(null)
+  // Actions (e.g. the ticket-sent confirmation) that must wait for a
+  // message's typewriter reveal to finish before they're allowed to
+  // appear — keyed by message id, run once by handleRevealDone.
+  const pendingAfterRevealRef = useRef(new Map())
 
   async function fetchSessions() {
     const { data, error } = await supabase
@@ -188,6 +194,47 @@ export default function Chat() {
     return data.reply
   }
 
+  async function fireTicket(sessionId, ticketSummary) {
+    try {
+      const ticketResponse = await fetch('/api/ticket', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_email: client.email,
+          bot: botId,
+          summary: ticketSummary,
+        }),
+      })
+      const ticketData = await ticketResponse.json()
+
+      if (!ticketResponse.ok) {
+        const raw =
+          ticketData?.error?.message ||
+          (typeof ticketData === 'string'
+            ? ticketData
+            : JSON.stringify(ticketData))
+        throw new Error(raw)
+      }
+
+      addEphemeralMessage(
+        sessionId,
+        'system-success',
+        '✅ Ticket sent to the FundiAI team',
+      )
+    } catch (ticketError) {
+      addEphemeralMessage(sessionId, 'system-error', ticketError.message)
+    }
+  }
+
+  function handleRevealDone(messageId) {
+    setRevealingMessageId((current) => (current === messageId ? null : current))
+    const pending = pendingAfterRevealRef.current.get(messageId)
+    if (pending) {
+      pendingAfterRevealRef.current.delete(messageId)
+      pending()
+    }
+  }
+
   async function runAssistantTurn(sessionId, apiMessages) {
     setSendingSessionId(sessionId)
     try {
@@ -207,40 +254,27 @@ export default function Chat() {
         'assistant',
         visibleContent,
       )
-      if (selectedSessionIdRef.current === sessionId) {
-        setMessages((prev) => [...prev, savedAssistantMessage])
+      const isVisible = selectedSessionIdRef.current === sessionId
+
+      if (isVisible) {
+        const newMessage = { ...savedAssistantMessage, isNew: true }
+        setMessages((prev) => [...prev, newMessage])
+        setRevealingMessageId(newMessage.id)
       }
       await touchSession(sessionId)
 
       if (ticketSummary) {
-        try {
-          const ticketResponse = await fetch('/api/ticket', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              client_email: client.email,
-              bot: botId,
-              summary: ticketSummary,
-            }),
-          })
-          const ticketData = await ticketResponse.json()
-
-          if (!ticketResponse.ok) {
-            const raw =
-              ticketData?.error?.message ||
-              (typeof ticketData === 'string'
-                ? ticketData
-                : JSON.stringify(ticketData))
-            throw new Error(raw)
-          }
-
-          addEphemeralMessage(
-            sessionId,
-            'system-success',
-            '✅ Ticket sent to the FundiAI team',
+        if (isVisible) {
+          // Wait for the typewriter reveal to finish so the ticket
+          // confirmation doesn't pop in mid-typing — handleRevealDone
+          // fires this once TypewriterText's onDone runs.
+          pendingAfterRevealRef.current.set(savedAssistantMessage.id, () =>
+            fireTicket(sessionId, ticketSummary),
           )
-        } catch (ticketError) {
-          addEphemeralMessage(sessionId, 'system-error', ticketError.message)
+        } else {
+          // Nothing is animating (user navigated away) — no reveal to
+          // wait for, so fire it right away.
+          await fireTicket(sessionId, ticketSummary)
         }
       }
     } catch (error) {
@@ -344,12 +378,15 @@ export default function Chat() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedSessionId(null)
     setMessages([])
+    setRevealingMessageId(null)
     fetchSessions()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client.email, botId])
 
   useEffect(() => {
     let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRevealingMessageId(null)
 
     async function loadAndMaybeGreet() {
       const rows = await fetchMessages(selectedSessionId)
@@ -471,9 +508,16 @@ export default function Chat() {
                 </p>
               )}
               {messages.map((message) => (
-                <MessageBubble key={message.id} message={message} bot={botId} />
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  bot={botId}
+                  onRevealDone={handleRevealDone}
+                />
               ))}
-              {isSending && <TypingIndicatorRow bot={botId} />}
+              {isSending && !revealingMessageId && (
+                <TypingIndicatorRow bot={botId} />
+              )}
               <div ref={messagesEndRef} />
             </div>
             <div className="mx-auto w-full max-w-2xl px-2 pb-2">
@@ -500,7 +544,7 @@ function BotAvatar({ bot }) {
   )
 }
 
-function MessageBubble({ message, bot }) {
+function MessageBubble({ message, bot, onRevealDone }) {
   if (message.role === 'system') {
     const isError = message.kind === 'system-error'
     return (
@@ -534,9 +578,16 @@ function MessageBubble({ message, bot }) {
       <div
         className={`max-w-md rounded-2xl rounded-bl-sm bg-gradient-to-br from-fundi-blue to-fundi-dark px-4 py-2 text-white ${ASSISTANT_MARKDOWN_CLASSES}`}
       >
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-          {message.content}
-        </ReactMarkdown>
+        {message.isNew ? (
+          <TypewriterText
+            text={message.content}
+            onDone={() => onRevealDone(message.id)}
+          />
+        ) : (
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {message.content}
+          </ReactMarkdown>
+        )}
       </div>
     </div>
   )
