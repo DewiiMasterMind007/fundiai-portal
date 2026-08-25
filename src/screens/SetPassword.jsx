@@ -98,7 +98,7 @@ export default function SetPassword() {
 
   if (status === 'verifying') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-fundi-bg font-sans">
+      <div className="flex min-h-screen items-center justify-center bg-fundi-bg p-4 font-sans">
         <p className="text-sm text-gray-500">Verifying your link...</p>
       </div>
     )
@@ -106,8 +106,8 @@ export default function SetPassword() {
 
   if (status === 'invalid') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-fundi-bg font-sans">
-        <div className="w-full max-w-sm rounded-2xl bg-white p-8 text-center shadow-lg">
+      <div className="flex min-h-screen items-center justify-center bg-fundi-bg p-4 font-sans">
+        <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-lg sm:p-8">
           <p className="text-fundi-dark">
             This link has expired or already been used. Please request a
             new password reset from the login screen.
@@ -124,8 +124,8 @@ export default function SetPassword() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-fundi-bg font-sans">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-lg">
+    <div className="flex min-h-screen items-center justify-center bg-fundi-bg p-4 font-sans">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-lg sm:p-8">
         <div className="mb-6 text-center">
           <div className="mb-4 text-2xl font-bold text-fundi-dark">FA</div>
           <h1 className="text-xl font-semibold text-fundi-dark">
@@ -137,23 +137,25 @@ export default function SetPassword() {
           <input
             type="password"
             required
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="New password"
-            className="w-full rounded-full border border-gray-300 px-4 py-2 text-fundi-dark focus:border-fundi-blue focus:outline-none"
+            className="w-full rounded-full border border-gray-300 px-4 py-3 text-fundi-dark focus:border-fundi-blue focus:outline-none"
           />
           <input
             type="password"
             required
+            autoComplete="new-password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="Confirm password"
-            className="w-full rounded-full border border-gray-300 px-4 py-2 text-fundi-dark focus:border-fundi-blue focus:outline-none"
+            className="w-full rounded-full border border-gray-300 px-4 py-3 text-fundi-dark focus:border-fundi-blue focus:outline-none"
           />
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-full bg-fundi-blue px-4 py-2 font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+            className="w-full rounded-full bg-fundi-blue px-4 py-3 font-medium text-white transition hover:opacity-90 disabled:opacity-50"
           >
             {submitting ? 'Setting password...' : 'Set Password'}
           </button>

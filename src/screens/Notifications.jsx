@@ -306,7 +306,7 @@ export default function Notifications() {
   return (
     <div className="flex h-full gap-6 font-sans">
       <div
-        className="flex w-56 flex-shrink-0 flex-col gap-4 rounded-2xl p-4"
+        className="hidden w-56 flex-shrink-0 flex-col gap-4 rounded-2xl p-4 md:flex"
         style={{ background: 'var(--fundi-gradient)' }}
       >
         <h1 className="text-lg font-bold text-white">Fundi's DM</h1>

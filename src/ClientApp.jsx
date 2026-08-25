@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { useClient } from './context/ClientContext'
 import Sidebar from './components/Sidebar'
+import MobileTopBar from './components/MobileTopBar'
+import MobileBottomNav from './components/MobileBottomNav'
 import Login from './screens/Login'
 import Home from './screens/Home'
 import Chat from './screens/Chat'
@@ -59,13 +61,17 @@ function AppShell() {
   }
 
   return (
-    <div className="flex h-screen bg-fundi-dark">
-      <Sidebar />
-      <div className="flex-1 rounded-l-3xl bg-fundi-bg p-6">
-        <div className="h-full overflow-auto rounded-2xl bg-white p-6 shadow-sm">
+    <div className="flex h-screen flex-col bg-fundi-dark md:flex-row">
+      <div className="hidden md:block">
+        <Sidebar />
+      </div>
+      <MobileTopBar />
+      <div className="min-h-0 flex-1 bg-fundi-bg md:rounded-l-3xl md:p-6">
+        <div className="h-full overflow-auto bg-white p-4 pb-20 shadow-sm md:rounded-2xl md:p-6 md:pb-6">
           <Outlet />
         </div>
       </div>
+      <MobileBottomNav />
     </div>
   )
 }

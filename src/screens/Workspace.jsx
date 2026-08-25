@@ -131,7 +131,7 @@ export default function Workspace() {
 
   return (
     <div className="flex h-full gap-6 overflow-hidden font-sans">
-      <div className="flex h-full w-64 flex-shrink-0 flex-col gap-4">
+      <div className="hidden h-full w-64 flex-shrink-0 flex-col gap-4 md:flex">
         <div className="flex items-center gap-2 px-1">
           <h2 className="text-lg font-semibold text-fundi-dark">
             Fundi Workspace

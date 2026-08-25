@@ -62,8 +62,8 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-fundi-bg font-sans">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-lg">
+    <div className="flex min-h-screen items-center justify-center bg-fundi-bg p-4 font-sans">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-lg sm:p-8">
         <div className="mb-6 text-center">
           <img
             src="/HorizontalLogo_FundiAI.png"
@@ -94,15 +94,16 @@ export default function Login() {
             <input
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full rounded-full border border-gray-300 px-4 py-2 text-fundi-dark focus:border-fundi-blue focus:outline-none"
+              className="w-full rounded-full border border-gray-300 px-4 py-3 text-fundi-dark focus:border-fundi-blue focus:outline-none"
             />
             <button
               type="submit"
               disabled={submitting}
-              className="w-full rounded-full bg-fundi-blue px-4 py-2 font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+              className="w-full rounded-full bg-fundi-blue px-4 py-3 font-medium text-white transition hover:opacity-90 disabled:opacity-50"
             >
               {submitting ? 'Sending...' : 'Send reset link'}
             </button>
@@ -119,23 +120,25 @@ export default function Login() {
             <input
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full rounded-full border border-gray-300 px-4 py-2 text-fundi-dark focus:border-fundi-blue focus:outline-none"
+              className="w-full rounded-full border border-gray-300 px-4 py-3 text-fundi-dark focus:border-fundi-blue focus:outline-none"
             />
             <input
               type="password"
               required
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
-              className="w-full rounded-full border border-gray-300 px-4 py-2 text-fundi-dark focus:border-fundi-blue focus:outline-none"
+              className="w-full rounded-full border border-gray-300 px-4 py-3 text-fundi-dark focus:border-fundi-blue focus:outline-none"
             />
             <button
               type="submit"
               disabled={submitting}
-              className="w-full rounded-full bg-fundi-blue px-4 py-2 font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+              className="w-full rounded-full bg-fundi-blue px-4 py-3 font-medium text-white transition hover:opacity-90 disabled:opacity-50"
             >
               {submitting ? 'Signing in...' : 'Sign In'}
             </button>

@@ -417,7 +417,7 @@ export default function Chat() {
 
   return (
     <div className="flex h-full gap-6 overflow-hidden font-sans">
-      <div className="flex h-full w-72 flex-shrink-0 flex-col gap-4">
+      <div className="hidden h-full w-72 flex-shrink-0 flex-col gap-4 md:flex">
         <AgentCard bot={botId} />
 
         <h2 className="text-sm font-semibold text-fundi-dark/70">
