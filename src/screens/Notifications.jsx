@@ -19,6 +19,110 @@ function BotAvatar({ botName }) {
   )
 }
 
+function TicketApprovalCard({ ticket, botName, actionState, onApprove, onRequestChanges }) {
+  const [showChangesForm, setShowChangesForm] = useState(false)
+  const [changesText, setChangesText] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [localError, setLocalError] = useState(null)
+
+  const approved = actionState === 'approved'
+  const changesRequested = actionState === 'changes-requested'
+
+  async function handleApproveClick() {
+    setSubmitting(true)
+    setLocalError(null)
+    const err = await onApprove(ticket)
+    setSubmitting(false)
+    if (err) setLocalError(err)
+  }
+
+  async function handleSubmitChanges() {
+    const trimmed = changesText.trim()
+    if (!trimmed) return
+
+    setSubmitting(true)
+    setLocalError(null)
+    const err = await onRequestChanges(ticket, trimmed)
+    setSubmitting(false)
+
+    if (err) {
+      setLocalError(err)
+    } else {
+      setShowChangesForm(false)
+    }
+  }
+
+  return (
+    <div className="flex items-start gap-2">
+      <BotAvatar botName={botName} />
+      <div className="max-w-md rounded-2xl rounded-bl-sm border-2 border-dashed border-fundi-blue/40 bg-white p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-fundi-dark/50">
+          Ready for your review
+        </p>
+        <p className="mt-1 whitespace-pre-wrap text-sm text-fundi-dark">
+          {ticket.request_summary}
+        </p>
+
+        {approved ? (
+          <p className="mt-2 text-xs font-medium text-fundi-green">✅ Approved</p>
+        ) : changesRequested ? (
+          <p className="mt-2 text-xs font-medium text-fundi-blue">
+            Sent back to the team for changes.
+          </p>
+        ) : (
+          <>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={handleApproveClick}
+                className="rounded-full bg-fundi-green px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => setShowChangesForm((v) => !v)}
+                className="rounded-full bg-fundi-bg px-3 py-1.5 text-xs font-medium text-fundi-dark transition hover:bg-fundi-bg/70 disabled:opacity-50"
+              >
+                Request Changes
+              </button>
+            </div>
+
+            {showChangesForm && (
+              <div className="mt-2 space-y-2">
+                <textarea
+                  value={changesText}
+                  onChange={(e) => setChangesText(e.target.value)}
+                  disabled={submitting}
+                  rows={2}
+                  placeholder="What still needs changing?"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-fundi-dark outline-none focus:border-fundi-blue"
+                />
+                <button
+                  type="button"
+                  disabled={submitting || !changesText.trim()}
+                  onClick={handleSubmitChanges}
+                  className="rounded-full bg-fundi-blue px-4 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {submitting ? 'Sending...' : 'Send'}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {localError && (
+          <div className="mt-2 rounded-lg bg-red-50 p-2 text-xs text-red-600">
+            {localError}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function Notifications() {
   const { client } = useClient()
   const location = useLocation()
@@ -28,6 +132,8 @@ export default function Notifications() {
   const [unreadCounts, setUnreadCounts] = useState({})
   const [selectedBotId, setSelectedBotId] = useState(null)
   const [notifications, setNotifications] = useState([])
+  const [awaitingTickets, setAwaitingTickets] = useState([])
+  const [ticketActionState, setTicketActionState] = useState({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [unreadDividerId, setUnreadDividerId] = useState(null)
@@ -72,29 +178,61 @@ export default function Notifications() {
     setUnreadCounts(counts)
   }
 
-  async function fetchNotifications(botId) {
+  async function loadThread(botId) {
     const token = ++fetchTokenRef.current
     setLoading(true)
     setError(null)
 
     try {
-      const { data, error: fetchError } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('client_email', client.email)
-        .eq('bot', botId)
-        .order('created_at', { ascending: true })
+      const [notifResult, ticketsResult] = await Promise.all([
+        supabase
+          .from('notifications')
+          .select('*')
+          .eq('client_email', client.email)
+          .eq('bot', botId)
+          .order('created_at', { ascending: true }),
+        // Cross-referencing by a live query (rather than matching on
+        // notification message text) is the reliable way to know which
+        // notifications represent a ticket actually awaiting approval.
+        supabase
+          .from('tickets')
+          .select('*')
+          .eq('client_email', client.email)
+          .eq('bot', botId)
+          .eq('status', 'awaiting_client_approval')
+          .order('created_at', { ascending: true }),
+      ])
 
-      if (fetchTokenRef.current !== token) return []
-      if (fetchError) throw new Error(fetchError.message)
+      if (fetchTokenRef.current !== token) return
+      if (notifResult.error) throw new Error(notifResult.error.message)
+      if (ticketsResult.error) throw new Error(ticketsResult.error.message)
 
-      const rows = data ?? []
+      const rows = notifResult.data ?? []
       setNotifications(rows)
-      return rows
+      setAwaitingTickets(ticketsResult.data ?? [])
+
+      const firstUnread = rows.find((n) => !n.is_read)
+      setUnreadDividerId(firstUnread?.id ?? null)
+
+      if (firstUnread) {
+        const { error: updateError } = await supabase
+          .from('notifications')
+          .update({ is_read: true })
+          .eq('client_email', client.email)
+          .eq('bot', botId)
+          .eq('is_read', false)
+
+        if (updateError) {
+          console.error('Failed to mark notifications as read:', updateError.message)
+        } else {
+          // Reflect locally right away so the badge drops to 0 immediately.
+          setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
+          setUnreadCounts((prev) => ({ ...prev, [botId]: 0 }))
+        }
+      }
     } catch (err) {
-      if (fetchTokenRef.current !== token) return []
+      if (fetchTokenRef.current !== token) return
       setError(err.message)
-      return []
     } finally {
       if (fetchTokenRef.current === token) setLoading(false)
     }
@@ -106,36 +244,42 @@ export default function Notifications() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client.email, location.pathname])
 
-  async function handleSelectBot(botId) {
+  function handleSelectBot(botId) {
     setSelectedBotId(botId)
     setUnreadDividerId(null)
+    setTicketActionState({})
+    loadThread(botId)
+  }
 
-    const rows = await fetchNotifications(botId)
+  async function handleApproveTicket(ticket) {
+    const { error: updateError } = await supabase
+      .from('tickets')
+      .update({ status: 'approved' })
+      .eq('id', ticket.id)
 
-    const firstUnread = rows.find((n) => !n.is_read)
-    setUnreadDividerId(firstUnread?.id ?? null)
-    if (!firstUnread) return
+    if (updateError) return updateError.message
+
+    setTicketActionState((prev) => ({ ...prev, [ticket.id]: 'approved' }))
+    return null
+  }
+
+  async function handleRequestChanges(ticket, note) {
+    const newSummary = `${ticket.request_summary}\n\n[Client requested changes]: ${note}`
 
     const { error: updateError } = await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('client_email', client.email)
-      .eq('bot', botId)
-      .eq('is_read', false)
+      .from('tickets')
+      .update({ status: 'open', request_summary: newSummary })
+      .eq('id', ticket.id)
 
-    if (updateError) {
-      console.error('Failed to mark notifications as read:', updateError.message)
-      return
-    }
+    if (updateError) return updateError.message
 
-    // Reflect locally right away so the badge drops to 0 immediately.
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
-    setUnreadCounts((prev) => ({ ...prev, [botId]: 0 }))
+    setTicketActionState((prev) => ({ ...prev, [ticket.id]: 'changes-requested' }))
+    return null
   }
 
   function handleRefresh() {
     if (selectedBotId) {
-      fetchNotifications(selectedBotId)
+      loadThread(selectedBotId)
     } else {
       fetchActiveBotsAndCounts()
     }
@@ -153,6 +297,11 @@ export default function Notifications() {
     ? (BOTS[selectedBotId] ?? { name: 'Fundi', role: 'Your AI Assistant' })
     : null
   const decorativeCount = Math.max(0, TOTAL_AVATAR_SLOTS - activeBotIds.length)
+
+  const feedItems = [
+    ...notifications.map((n) => ({ kind: 'notification', key: `n-${n.id}`, createdAt: n.created_at, data: n })),
+    ...awaitingTickets.map((t) => ({ kind: 'ticket', key: `t-${t.id}`, createdAt: t.created_at, data: t })),
+  ].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
 
   return (
     <div className="flex h-full gap-6 font-sans">
@@ -232,52 +381,70 @@ export default function Notifications() {
             <p className="mt-16 text-center text-sm text-gray-400">
               Loading messages...
             </p>
-          ) : notifications.length === 0 ? (
+          ) : feedItems.length === 0 ? (
             <p className="mt-16 text-center text-sm text-gray-400">
               You're all caught up 🎉
             </p>
           ) : (
             <div className="space-y-1 px-1">
-              {notifications.map((n) => (
-                <div key={n.id}>
-                  <p className="my-2 text-center text-xs text-gray-400">
-                    {n.created_at &&
-                      format(new Date(n.created_at), 'd MMMM yyyy, h:mmaaa')}
-                  </p>
-
-                  {n.id === unreadDividerId && (
-                    <div className="my-3 flex items-center justify-center">
-                      <span className="rounded-full bg-fundi-green px-3 py-1 text-xs font-semibold text-white">
-                        New Unread Messages
-                      </span>
+              {feedItems.map((item) => {
+                if (item.kind === 'ticket') {
+                  const ticket = item.data
+                  return (
+                    <div key={item.key} className="my-2">
+                      <TicketApprovalCard
+                        ticket={ticket}
+                        botName={selectedBot.name}
+                        actionState={ticketActionState[ticket.id]}
+                        onApprove={handleApproveTicket}
+                        onRequestChanges={handleRequestChanges}
+                      />
                     </div>
-                  )}
+                  )
+                }
 
-                  <div className="flex items-start gap-2">
-                    <BotAvatar botName={selectedBot.name} />
-                    <div
-                      className={`max-w-md rounded-2xl rounded-bl-sm px-4 py-2 text-white ${ASSISTANT_MARKDOWN_CLASSES}`}
-                      style={{ background: 'var(--fundi-gradient)' }}
-                    >
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {n.message}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
+                const n = item.data
+                return (
+                  <div key={item.key}>
+                    <p className="my-2 text-center text-xs text-gray-400">
+                      {n.created_at &&
+                        format(new Date(n.created_at), 'd MMMM yyyy, h:mmaaa')}
+                    </p>
 
-                  {n.link && (
-                    <div className="ml-10 mt-2">
-                      <button
-                        type="button"
-                        onClick={() => handleReviewClick(n.link)}
-                        className="rounded-full bg-fundi-blue px-4 py-1.5 text-xs font-medium text-white transition hover:opacity-90"
+                    {n.id === unreadDividerId && (
+                      <div className="my-3 flex items-center justify-center">
+                        <span className="rounded-full bg-fundi-green px-3 py-1 text-xs font-semibold text-white">
+                          New Unread Messages
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex items-start gap-2">
+                      <BotAvatar botName={selectedBot.name} />
+                      <div
+                        className={`max-w-md rounded-2xl rounded-bl-sm px-4 py-2 text-white ${ASSISTANT_MARKDOWN_CLASSES}`}
+                        style={{ background: 'var(--fundi-gradient)' }}
                       >
-                        Review Content
-                      </button>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {n.message}
+                        </ReactMarkdown>
+                      </div>
                     </div>
-                  )}
-                </div>
-              ))}
+
+                    {n.link && (
+                      <div className="ml-10 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => handleReviewClick(n.link)}
+                          className="rounded-full bg-fundi-blue px-4 py-1.5 text-xs font-medium text-white transition hover:opacity-90"
+                        >
+                          Review Content
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

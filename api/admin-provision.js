@@ -1,3 +1,5 @@
+import { appsScriptFailed, appsScriptErrorMessage } from './_lib/appsScript.js'
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -62,6 +64,11 @@ export default async function handler(req, res) {
     })
 
     const data = await response.json()
+
+    if (appsScriptFailed(data)) {
+      return res.status(500).json({ error: appsScriptErrorMessage(data) })
+    }
+
     return res.status(response.status).json(data)
   } catch (error) {
     return res.status(500).json({ error: error.message })

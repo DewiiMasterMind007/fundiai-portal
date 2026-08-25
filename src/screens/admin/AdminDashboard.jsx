@@ -69,10 +69,13 @@ function ClientRow({ row }) {
 
       <div className="flex-shrink-0">
         {needsAttentionCount > 0 ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-800">
+          <Link
+            to={`/admin/tickets?client=${encodeURIComponent(row.client_email ?? '')}`}
+            className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-200"
+          >
             <AlertTriangle size={13} />
             {needsAttentionCount} needs attention
-          </span>
+          </Link>
         ) : (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-500">
             <CheckCircle2 size={13} />
