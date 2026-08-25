@@ -260,8 +260,41 @@ export default function AdminTickets() {
       link: '/notifications',
     })
 
-    if (notifyError) {
-      setUpdateErrors((prev) => ({ ...prev, [ticket.id]: notifyError.message }))
+    // The status change above has already happened either way — these two
+    // follow-up steps only need their failures made visible, not to block
+    // or roll back what already succeeded.
+    let emailError = null
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+
+      const emailResponse = await fetch('/api/admin-notify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          client_email: ticket.client_email,
+          request_summary: ticket.request_summary,
+        }),
+      })
+      const emailData = await emailResponse.json().catch(() => ({}))
+
+      if (!emailResponse.ok) {
+        emailError =
+          emailData?.error || `Request failed with status ${emailResponse.status}`
+      }
+    } catch (err) {
+      emailError = err.message
+    }
+
+    const combinedError = [notifyError?.message, emailError]
+      .filter(Boolean)
+      .join(' | ')
+
+    if (combinedError) {
+      setUpdateErrors((prev) => ({ ...prev, [ticket.id]: combinedError }))
     }
     setUpdatingIds((prev) => ({ ...prev, [ticket.id]: false }))
   }
