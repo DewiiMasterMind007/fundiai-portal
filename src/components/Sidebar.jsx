@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Bell, Home, Folder, LogOut } from 'lucide-react'
+import { Bell, Home, Folder, Calendar, LogOut } from 'lucide-react'
 import { useClient } from '../context/ClientContext'
 import { useUnreadCount } from '../context/useUnreadCount'
 
@@ -7,6 +7,7 @@ const navItems = [
   { to: '/notifications', icon: Bell, label: 'Notifications' },
   { to: '/', icon: Home, label: 'Home' },
   { to: '/workspace', icon: Folder, label: 'Workspace' },
+  { to: '/schedule', icon: Calendar, label: 'Schedule' },
 ]
 
 export default function Sidebar() {

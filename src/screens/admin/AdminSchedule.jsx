@@ -9,6 +9,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { getFreshAccessToken } from '../../lib/getFreshAccessToken'
 
 const PLATFORMS = ['facebook', 'instagram', 'blog']
 const PLATFORM_LABELS = {
@@ -194,8 +195,10 @@ function PostForm({ client, platform, editingPost, onClose, onSaved }) {
     setSaving(true)
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession()
-      const token = sessionData?.session?.access_token
+      const token = await getFreshAccessToken()
+      if (!token) {
+        throw new Error('Your session could not be verified. Please try again.')
+      }
 
       const body = editingPost
         ? {
@@ -497,8 +500,10 @@ export default function AdminSchedule() {
     setDeleteErrors((prev) => ({ ...prev, [post.rowNumber]: null }))
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession()
-      const token = sessionData?.session?.access_token
+      const token = await getFreshAccessToken()
+      if (!token) {
+        throw new Error('Your session could not be verified. Please try again.')
+      }
 
       const response = await fetch('/api/admin-schedule-write', {
         method: 'POST',

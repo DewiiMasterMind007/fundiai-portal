@@ -9,13 +9,9 @@ function isSettingPassword() {
 }
 
 // Events that hand us a session we should actually (re)load client data
-// for — explicitly includes TOKEN_REFRESHED alongside SIGNED_IN/
-// INITIAL_SESSION so a refreshed token is treated just like a fresh login.
-const SESSION_READY_EVENTS = new Set([
-  'SIGNED_IN',
-  'INITIAL_SESSION',
-  'TOKEN_REFRESHED',
-])
+// for. TOKEN_REFRESHED is deliberately NOT included — see the comment
+// where it's handled below.
+const SESSION_READY_EVENTS = new Set(['SIGNED_IN', 'INITIAL_SESSION'])
 
 const EXPIRY_BUFFER_SECONDS = 10
 
@@ -130,6 +126,17 @@ export function ClientProvider({ children }) {
         setClient(null)
         setFundiFileText('')
         setLoading(false)
+        return
+      }
+
+      if (event === 'TOKEN_REFRESHED') {
+        // Supabase already successfully refreshed this session — nothing
+        // about the client's identity or data changed just because the
+        // token rotated, so there's nothing here worth re-fetching.
+        // Re-running the full load (and its signOut-on-failure path) on
+        // every background refresh used to mean any transient hiccup in
+        // that redundant re-fetch — unrelated to whatever the user was
+        // actually doing — could force them out of an active session.
         return
       }
 
