@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import AdminSidebar from './components/AdminSidebar'
 import AdminDashboard from './screens/admin/AdminDashboard'
+import AdminNewClient from './screens/admin/AdminNewClient'
 
 function AdminShell() {
   return (
@@ -20,6 +21,7 @@ export default function AdminApp() {
     <Routes>
       <Route path="/admin" element={<AdminShell />}>
         <Route index element={<AdminDashboard />} />
+        <Route path="new-client" element={<AdminNewClient />} />
       </Route>
       {/* Any unmatched /admin/* path, and any admin session landing on a
           non-admin path (e.g. "/"), lands back on the dashboard. */}

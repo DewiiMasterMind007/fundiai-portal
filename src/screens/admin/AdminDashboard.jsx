@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Users, AlertTriangle, Ticket, CheckCircle2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Users, AlertTriangle, Ticket, CheckCircle2, Plus } from 'lucide-react'
 import { useAdmin } from '../../context/AdminContext'
 import { supabase } from '../../lib/supabase'
 import { BOTS } from '../../lib/bots'
@@ -151,12 +152,23 @@ export default function AdminDashboard() {
 
   return (
     <div className="font-sans">
-      <h1 className="text-2xl font-semibold text-fundi-dark">
-        Admin Dashboard
-      </h1>
-      <p className="mt-1 text-sm text-gray-500">
-        Welcome, {admin?.full_name}.
-      </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-fundi-dark">
+            Admin Dashboard
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Welcome, {admin?.full_name}.
+          </p>
+        </div>
+        <Link
+          to="/admin/new-client"
+          className="flex flex-shrink-0 items-center gap-1.5 rounded-full bg-fundi-blue px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+        >
+          <Plus size={16} />
+          New Client
+        </Link>
+      </div>
 
       <div className="mt-6 grid grid-cols-3 gap-4">
         <StatCard
