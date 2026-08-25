@@ -87,6 +87,10 @@ export default function ClientApp() {
         <Route path="notifications" element={<Notifications />} />
         <Route path="schedule" element={<Schedule />} />
       </Route>
+      {/* Any unmatched path (e.g. "/admin" left over from an admin
+          session that just logged out) falls back to Home, where
+          AppShell's own session check takes over from there. */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
