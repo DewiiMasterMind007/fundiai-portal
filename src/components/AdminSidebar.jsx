@@ -1,11 +1,12 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Users, Ticket, LogOut } from 'lucide-react'
+import { LayoutDashboard, Users, Ticket, Calendar, LogOut } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/admin/clients', icon: Users, label: 'Clients' },
   { to: '/admin/tickets', icon: Ticket, label: 'Tickets' },
+  { to: '/admin/schedule', icon: Calendar, label: 'Schedule' },
 ]
 
 export default function AdminSidebar() {

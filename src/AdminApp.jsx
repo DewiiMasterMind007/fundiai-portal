@@ -3,6 +3,7 @@ import AdminSidebar from './components/AdminSidebar'
 import AdminDashboard from './screens/admin/AdminDashboard'
 import AdminNewClient from './screens/admin/AdminNewClient'
 import AdminTickets from './screens/admin/AdminTickets'
+import AdminSchedule from './screens/admin/AdminSchedule'
 
 function AdminShell() {
   return (
@@ -24,6 +25,7 @@ export default function AdminApp() {
         <Route index element={<AdminDashboard />} />
         <Route path="new-client" element={<AdminNewClient />} />
         <Route path="tickets" element={<AdminTickets />} />
+        <Route path="schedule" element={<AdminSchedule />} />
       </Route>
       {/* Any unmatched /admin/* path, and any admin session landing on a
           non-admin path (e.g. "/"), lands back on the dashboard. */}
