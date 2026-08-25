@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { ClientProvider } from './context/ClientContext'
 import { AdminProvider, useAdmin } from './context/AdminContext'
 import { supabase } from './lib/supabase'
@@ -19,6 +19,20 @@ function CenteredLoading() {
 // app and the existing client app based on AdminContext's lookup.
 function AdminOrClientGate() {
   const { admin, loading } = useAdmin()
+
+  // useLayoutEffect, not useEffect: this must clear the flag before the
+  // fresh ClientProvider mounted below (when not an admin) runs its own
+  // effect and registers its onAuthStateChange listener — layout effects
+  // always run before passive effects in the same commit, regardless of
+  // parent/child order, so this can't lose the race the way two regular
+  // effects could.
+  useLayoutEffect(() => {
+    if (loading) return
+    // Admin status is now known either way — release ClientContext's guard
+    // so a "not admin" outcome lets the fresh ClientProvider below load
+    // normally (see the comment in AuthGate for why this flag is set).
+    sessionStorage.removeItem(SETTING_PASSWORD_FLAG_KEY)
+  }, [loading])
 
   if (loading) {
     return <CenteredLoading />
@@ -52,6 +66,14 @@ export default function AuthGate() {
 
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return
+      // A session already exists on first load (e.g. a page refresh) —
+      // guard it too, in case a TOKEN_REFRESHED or similar event reaches
+      // a stray ClientContext listener while admin status is still
+      // unknown. Harmless no-op if this turns out to be a plain client;
+      // AdminOrClientGate's effect clears it once admin status resolves.
+      if (data.session) {
+        sessionStorage.setItem(SETTING_PASSWORD_FLAG_KEY, 'true')
+      }
       setHasSession(!!data.session)
       setSessionChecked(true)
     })
@@ -62,6 +84,25 @@ export default function AuthGate() {
       if (event === 'PASSWORD_RECOVERY') {
         setIsRecoveryFlow(true)
       }
+
+      // This must run synchronously, before any setState below, and
+      // before ClientContext's own listener for this same event gets a
+      // chance to run (listeners fire in registration order, and this
+      // one was registered first). Without it, the pre-login
+      // ClientProvider mounted so Login.jsx can render is still
+      // subscribed at the exact moment a brand-new session appears —
+      // its listener would immediately try to load a `clients` row for
+      // it. For an admin (who has no such row) that fetch fails, and
+      // ClientContext's existing error handling signs the session back
+      // out — destroying the very session an admin just logged into,
+      // regardless of the component unmounting a moment later. Setting
+      // this flag makes ClientContext's own existing guard (already used
+      // for the password-recovery flow) skip that fetch-and-signout
+      // routine entirely until admin status is known.
+      if (newSession) {
+        sessionStorage.setItem(SETTING_PASSWORD_FLAG_KEY, 'true')
+      }
+
       setHasSession(!!newSession)
       setSessionChecked(true)
     })
@@ -72,13 +113,15 @@ export default function AuthGate() {
     }
   }, [])
 
-  // Read fresh on every render (not just at mount) — while SetPassword
-  // owns the session, it must keep rendering regardless of anything else
-  // going on here.
-  const isSettingPassword =
-    sessionStorage.getItem(SETTING_PASSWORD_FLAG_KEY) === 'true'
-
-  if (isRecoveryFlow || isSettingPassword) {
+  // Note: this deliberately does NOT also check the sessionStorage flag
+  // itself (unlike the pre-admin-portal version of this gate) — this
+  // component now writes that same flag below for an unrelated reason
+  // (telling ClientContext to stand down while admin status is being
+  // checked), so treating "flag is set" as "show SetPassword" here would
+  // misfire the moment any session appears. `isRecoveryFlow` alone is
+  // sufficient: it's set synchronously from the URL on mount and via the
+  // PASSWORD_RECOVERY event, and never reset back to false.
+  if (isRecoveryFlow) {
     return (
       <ClientProvider>
         <SetPassword />
