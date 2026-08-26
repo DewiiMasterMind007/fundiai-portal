@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Bell, RefreshCw } from 'lucide-react'
 import { useClient } from '../context/ClientContext'
+import { useMobileChrome } from '../context/MobileChromeContext'
 import { supabase } from '../lib/supabase'
 import { BOTS } from '../lib/bots'
 import { ASSISTANT_MARKDOWN_CLASSES } from '../lib/markdownBubble'
@@ -125,6 +126,7 @@ function TicketApprovalCard({ ticket, botName, actionState, onApprove, onRequest
 
 export default function Notifications() {
   const { client } = useClient()
+  const { setHeader, setHideBottomNav } = useMobileChrome()
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -251,6 +253,29 @@ export default function Notifications() {
     loadThread(botId)
   }
 
+  useEffect(() => {
+    if (!selectedBotId) {
+      setHideBottomNav(false)
+      setHeader(null)
+      return
+    }
+    const info = BOTS[selectedBotId] ?? { name: 'Fundi' }
+    setHideBottomNav(true)
+    setHeader({
+      onBack: () => setSelectedBotId(null),
+      avatarLabel: info.name.charAt(0),
+      title: info.name,
+    })
+  }, [selectedBotId, setHeader, setHideBottomNav])
+
+  useEffect(() => {
+    return () => {
+      setHideBottomNav(false)
+      setHeader(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function handleApproveTicket(ticket) {
     const { error: updateError } = await supabase
       .from('tickets')
@@ -306,6 +331,35 @@ export default function Notifications() {
   return (
     <div className="flex h-full gap-6 font-sans">
       <div
+        className={`${selectedBotId ? 'hidden' : 'flex'} h-full w-full flex-shrink-0 flex-col gap-1 overflow-y-auto md:hidden`}
+      >
+        {activeBotIds.map((botId) => {
+          const info = BOTS[botId] ?? { name: 'Fundi' }
+          const count = unreadCounts[botId] ?? 0
+          return (
+            <button
+              key={botId}
+              type="button"
+              onClick={() => handleSelectBot(botId)}
+              className="flex items-center gap-3 rounded-xl px-2 py-3 text-left transition hover:bg-fundi-bg/60"
+            >
+              <div className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-fundi-dark text-sm font-semibold text-white">
+                {info.name.charAt(0)}
+                {count > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-semibold text-white">
+                    {count}
+                  </span>
+                )}
+              </div>
+              <span className="text-sm font-medium text-fundi-dark">
+                {info.name}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      <div
         className="hidden w-56 flex-shrink-0 flex-col gap-4 rounded-2xl p-4 md:flex"
         style={{ background: 'var(--fundi-gradient)' }}
       >
@@ -345,7 +399,9 @@ export default function Notifications() {
         </div>
       </div>
 
-      <div className="flex h-full flex-1 flex-col overflow-hidden">
+      <div
+        className={`${selectedBotId ? 'flex' : 'hidden'} h-full flex-1 flex-col overflow-hidden md:flex`}
+      >
         <div className="mb-2 flex items-center justify-between">
           <div>
             {selectedBot && (

@@ -16,6 +16,7 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
+  ArrowLeft,
   X,
   Camera,
   FileText,
@@ -24,8 +25,29 @@ import {
   Lock,
 } from 'lucide-react'
 import { useClient } from '../context/ClientContext'
+import { useMobileChrome } from '../context/MobileChromeContext'
 import { supabase } from '../lib/supabase'
 import ErrorBoundary from '../components/ErrorBoundary'
+
+const BELOW_MD_QUERY = '(max-width: 767px)'
+
+// The calendar cell's tap behavior genuinely differs by breakpoint (open
+// the modal directly vs. reveal the day panel below the grid) — CSS alone
+// can hide/show elements but can't change what a single onClick does.
+function useIsBelowMd() {
+  const [isBelowMd, setIsBelowMd] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(BELOW_MD_QUERY).matches,
+  )
+
+  useEffect(() => {
+    const mql = window.matchMedia(BELOW_MD_QUERY)
+    const handler = (e) => setIsBelowMd(e.matches)
+    mql.addEventListener('change', handler)
+    return () => mql.removeEventListener('change', handler)
+  }, [])
+
+  return isBelowMd
+}
 
 const PLATFORMS = ['facebook', 'instagram', 'blog']
 const FILTER_OPTIONS = ['all', ...PLATFORMS]
@@ -118,6 +140,18 @@ function PlatformIcon({ platform, size = 12 }) {
   )
 }
 
+function PlatformDot({ platform }) {
+  if (platform === 'facebook') {
+    return <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#1877F2]" />
+  }
+  if (platform === 'instagram') {
+    return (
+      <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-yellow-400" />
+    )
+  }
+  return <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-fundi-dark" />
+}
+
 function BotAvatar({ botName }) {
   return (
     <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-fundi-dark text-xs font-semibold text-white">
@@ -126,12 +160,53 @@ function BotAvatar({ botName }) {
   )
 }
 
+function DayPostsPanel({ date, posts, onSelectPost }) {
+  let formattedDate
+  try {
+    formattedDate = format(parseISO(date), 'EEEE, d MMMM yyyy')
+  } catch {
+    formattedDate = date
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-gray-200 bg-white p-3 md:hidden">
+      <h3 className="mb-2 text-sm font-semibold text-fundi-dark">
+        {formattedDate}
+      </h3>
+      {posts.length === 0 ? (
+        <p className="text-xs text-gray-400">No posts scheduled yet</p>
+      ) : (
+        <div className="space-y-1">
+          {posts.map((post, i) => (
+            <button
+              key={post.rowNumber ?? i}
+              type="button"
+              onClick={() => onSelectPost(post)}
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition hover:bg-fundi-bg/60"
+            >
+              <PlatformIcon platform={post.platform} size={14} />
+              <span className="w-14 flex-shrink-0 text-xs text-gray-500">
+                {post.time || '--:--'}
+              </span>
+              <span className="truncate text-sm text-fundi-dark">
+                {post.caption || 'Untitled post'}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ScheduleContent() {
   const { client } = useClient()
+  const isBelowMd = useIsBelowMd()
 
   const [selectedPlatform, setSelectedPlatform] = useState('all')
   const [platformMenuOpen, setPlatformMenuOpen] = useState(false)
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(new Date()))
+  const [selectedDay, setSelectedDay] = useState(null)
 
   const [posts, setPosts] = useState([])
   const [loading, setLoading] = useState(false)
@@ -201,6 +276,11 @@ function ScheduleContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client.schedule_sheet_id, visibleMonth])
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedDay(null)
+  }, [visibleMonth, selectedPlatform])
+
   const filteredPosts = useMemo(() => {
     if (selectedPlatform === 'all') return posts
     return posts.filter((post) => post.platform === selectedPlatform)
@@ -219,7 +299,7 @@ function ScheduleContent() {
       className="flex h-full flex-col gap-4 font-sans"
       onClick={() => platformMenuOpen && setPlatformMenuOpen(false)}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between sm:gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-fundi-dark">
             Content Planner
@@ -237,7 +317,7 @@ function ScheduleContent() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative">
           <button
             type="button"
@@ -342,19 +422,38 @@ function ScheduleContent() {
               return (
                 <div
                   key={dateStr}
-                  onClick={() => dayPosts[0] && setModalPost(dayPosts[0])}
-                  className={`min-h-24 bg-white p-1.5 ${
+                  onClick={() => {
+                    if (dayPosts.length === 0) return
+                    if (isBelowMd) {
+                      setSelectedDay(dateStr)
+                    } else {
+                      setModalPost(dayPosts[0])
+                    }
+                  }}
+                  className={`min-h-14 bg-white p-1 md:min-h-24 md:p-1.5 ${
                     dayPosts.length > 0 ? 'cursor-pointer' : ''
                   } ${inMonth ? '' : 'bg-gray-50'}`}
                 >
                   <span
-                    className={`text-xs ${
+                    className={`text-[10px] md:text-xs ${
                       inMonth ? 'text-fundi-dark' : 'text-gray-300'
                     }`}
                   >
                     {format(day, 'd')}
                   </span>
-                  <div className="mt-1 space-y-1">
+
+                  <div className="mt-1 flex flex-wrap items-center gap-0.5 md:hidden">
+                    {dayPosts.slice(0, 3).map((post, i) => (
+                      <PlatformDot key={post.rowNumber ?? i} platform={post.platform} />
+                    ))}
+                    {dayPosts.length > 3 && (
+                      <span className="text-[8px] font-medium text-gray-400">
+                        +{dayPosts.length - 3}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-1 hidden space-y-1 md:block">
                     {dayPosts.map((post, i) => (
                       <button
                         key={post.rowNumber ?? i}
@@ -376,6 +475,14 @@ function ScheduleContent() {
           </div>
         )}
       </div>
+
+      {selectedDay && (
+        <DayPostsPanel
+          date={selectedDay}
+          posts={filteredPosts.filter((post) => post.date === selectedDay)}
+          onSelectPost={(post) => setModalPost(post)}
+        />
+      )}
 
       {import.meta.env.DEV && (
         <div className="border-t border-gray-200 pt-3">
@@ -409,6 +516,7 @@ function ScheduleContent() {
 
 function PostModal({ post, platform, client, onClose, onApproved }) {
   const botName = BOT_NAMES[client.bot_assigned] ?? 'Fundi'
+  const { setHideBottomNav } = useMobileChrome()
 
   const [approving, setApproving] = useState(false)
   const [approveError, setApproveError] = useState(null)
@@ -448,6 +556,12 @@ function PostModal({ post, platform, client, onClose, onApproved }) {
 
   useEffect(() => {
     return () => clearTimeout(confirmTimeoutRef.current)
+  }, [])
+
+  useEffect(() => {
+    setHideBottomNav(true)
+    return () => setHideBottomNav(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -510,15 +624,17 @@ function PostModal({ post, platform, client, onClose, onApproved }) {
       })
     }
 
-    window.addEventListener('mousemove', handleMove)
-    window.addEventListener('mouseup', handleUp)
+    window.addEventListener('pointermove', handleMove)
+    window.addEventListener('pointerup', handleUp)
+    window.addEventListener('pointercancel', handleUp)
     return () => {
-      window.removeEventListener('mousemove', handleMove)
-      window.removeEventListener('mouseup', handleUp)
+      window.removeEventListener('pointermove', handleMove)
+      window.removeEventListener('pointerup', handleUp)
+      window.removeEventListener('pointercancel', handleUp)
     }
   }, [dragging])
 
-  function handleImageMouseDown(e) {
+  function handleImagePointerDown(e) {
     if (!imageRef.current || isLocked) return
     e.preventDefault()
     const point = getRelativePercent(e, imageRef.current)
@@ -674,22 +790,30 @@ function PostModal({ post, platform, client, onClose, onApproved }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-0 md:p-6"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl"
+        className="h-full w-full overflow-y-auto bg-white p-4 shadow-xl md:h-auto md:w-full md:max-w-2xl md:rounded-2xl md:p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-4 flex items-start justify-between">
-          <h2 className="text-lg font-semibold text-fundi-dark">
+        <div className="mb-4 flex items-center gap-3 md:items-start md:justify-between">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Back"
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-fundi-bg md:hidden"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h2 className="flex-1 text-lg font-semibold text-fundi-dark md:flex-none">
             {formattedDate}
           </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition hover:bg-fundi-bg"
+            className="hidden h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-fundi-bg md:flex"
           >
             <X size={18} />
           </button>
@@ -712,7 +836,7 @@ function PostModal({ post, platform, client, onClose, onApproved }) {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div>
             <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-fundi-dark/50">
               Caption
@@ -775,7 +899,7 @@ function PostModal({ post, platform, client, onClose, onApproved }) {
                         setCaptionSubmitError(null)
                       }}
                       disabled={captionSubmitting}
-                      className="rounded-full px-3 py-1.5 text-xs font-medium text-fundi-dark hover:bg-fundi-bg"
+                      className="rounded-full px-3 py-3.5 text-xs font-medium text-fundi-dark hover:bg-fundi-bg md:py-1.5"
                     >
                       Cancel
                     </button>
@@ -783,7 +907,7 @@ function PostModal({ post, platform, client, onClose, onApproved }) {
                       type="button"
                       onClick={handleSubmitCaptionComment}
                       disabled={captionSubmitting || !captionText.trim()}
-                      className="rounded-full bg-fundi-blue px-4 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+                      className="rounded-full bg-fundi-blue px-4 py-3.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50 md:py-1.5"
                     >
                       {captionSubmitting ? 'Sending...' : 'Comment'}
                     </button>
@@ -811,7 +935,7 @@ function PostModal({ post, platform, client, onClose, onApproved }) {
                   type="button"
                   onClick={handleApprove}
                   disabled={approving}
-                  className="rounded-full bg-fundi-green px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+                  className="rounded-full bg-fundi-green px-4 py-3 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50 md:py-2"
                 >
                   {approving ? 'Approving...' : 'Approve'}
                 </button>
@@ -837,9 +961,12 @@ function PostModal({ post, platform, client, onClose, onApproved }) {
                   src={post.image_url}
                   alt=""
                   onError={() => setImgError(true)}
-                  onMouseDown={handleImageMouseDown}
+                  onPointerDown={handleImagePointerDown}
                   className="h-full w-full select-none rounded-lg object-cover"
-                  style={{ cursor: isLocked ? 'default' : 'crosshair' }}
+                  style={{
+                    cursor: isLocked ? 'default' : 'crosshair',
+                    touchAction: dragging ? 'none' : 'auto',
+                  }}
                   draggable={false}
                 />
 
@@ -911,7 +1038,7 @@ function PostModal({ post, platform, client, onClose, onApproved }) {
                         type="button"
                         onClick={handleCancelDraft}
                         disabled={cardMode === 'sending'}
-                        className="rounded-full px-3 py-1.5 text-xs font-medium text-fundi-dark hover:bg-fundi-bg"
+                        className="rounded-full px-3 py-3.5 text-xs font-medium text-fundi-dark hover:bg-fundi-bg md:py-1.5"
                       >
                         Cancel
                       </button>
@@ -919,7 +1046,7 @@ function PostModal({ post, platform, client, onClose, onApproved }) {
                         type="button"
                         onClick={handleSubmitRegionComment}
                         disabled={cardMode === 'sending' || !commentText.trim()}
-                        className="rounded-full bg-fundi-blue px-4 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+                        className="rounded-full bg-fundi-blue px-4 py-3.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50 md:py-1.5"
                       >
                         {cardMode === 'sending' ? 'Sending...' : 'Comment'}
                       </button>

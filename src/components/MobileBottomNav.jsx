@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { Bell, Home, Folder, Calendar } from 'lucide-react'
 import { useUnreadCount } from '../context/useUnreadCount'
+import { useMobileChrome } from '../context/MobileChromeContext'
 
 const tabs = [
   { to: '/', icon: Home, label: 'Home' },
@@ -12,11 +13,19 @@ const tabs = [
 export default function MobileBottomNav() {
   const location = useLocation()
   const unreadCount = useUnreadCount()
+  const { hideBottomNav } = useMobileChrome()
+
+  if (hideBottomNav) return null
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 flex h-16 items-center justify-around border-t border-gray-200 bg-white font-sans md:hidden">
       {tabs.map(({ to, icon: Icon, label }) => {
-        const isActive = location.pathname === to
+        // Chat isn't a tab of its own — Home is how a bot gets selected,
+        // so /chat/* routes highlight Home to match that mental model.
+        const isActive =
+          to === '/'
+            ? location.pathname === '/' || location.pathname.startsWith('/chat')
+            : location.pathname === to
         return (
           <Link
             key={to}

@@ -16,6 +16,7 @@ import {
   Check,
 } from 'lucide-react'
 import { useClient } from '../context/ClientContext'
+import { useMobileChrome } from '../context/MobileChromeContext'
 import { supabase } from '../lib/supabase'
 
 const RECENT_KEY_PREFIX = 'fundi_recent_'
@@ -52,6 +53,7 @@ function extractError(data) {
 
 export default function Workspace() {
   const { client } = useClient()
+  const { setHeader } = useMobileChrome()
 
   const [mainFileOpened, setMainFileOpened] = useState(false)
   const [folders, setFolders] = useState([])
@@ -129,9 +131,31 @@ export default function Workspace() {
 
   const isMainFileActive = mainFileOpened
 
+  useEffect(() => {
+    if (!mainFileOpened) {
+      setHeader(null)
+      return
+    }
+    if (!selectedFolder) {
+      setHeader({ onBack: () => setMainFileOpened(false), title: 'Main File' })
+      return
+    }
+    setHeader({
+      onBack: () => setSelectedFolder(null),
+      title: selectedFolder.name,
+    })
+  }, [mainFileOpened, selectedFolder, setHeader])
+
+  useEffect(() => {
+    return () => setHeader(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return (
     <div className="flex h-full gap-6 overflow-hidden font-sans">
-      <div className="hidden h-full w-64 flex-shrink-0 flex-col gap-4 md:flex">
+      <div
+        className={`${mainFileOpened ? 'hidden' : 'flex'} h-full w-full flex-shrink-0 flex-col gap-4 md:w-64 md:flex`}
+      >
         <div className="flex items-center gap-2 px-1">
           <h2 className="text-lg font-semibold text-fundi-dark">
             Fundi Workspace
@@ -191,7 +215,9 @@ export default function Workspace() {
         </div>
       </div>
 
-      <div className="flex h-full flex-1 flex-col overflow-hidden">
+      <div
+        className={`${mainFileOpened ? 'flex' : 'hidden'} h-full flex-1 flex-col overflow-hidden md:flex`}
+      >
         {!mainFileOpened ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
             <MousePointer2 size={28} className="text-fundi-blue" />
@@ -205,7 +231,7 @@ export default function Workspace() {
           </div>
         ) : (
           <>
-            <div className="mb-4 flex items-center gap-1 text-sm">
+            <div className="mb-4 hidden items-center gap-1 text-sm md:flex">
               <button
                 type="button"
                 onClick={() => setSelectedFolder(null)}
@@ -241,7 +267,7 @@ export default function Workspace() {
                 ) : foldersLoading ? (
                   <SkeletonGrid />
                 ) : (
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
                     {folders.map((folder) => (
                       <button
                         key={folder.id}
@@ -266,7 +292,7 @@ export default function Workspace() {
                   No files in this folder yet
                 </p>
               ) : (
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
                   {files.map((file, index) => (
                     <FileCard
                       key={file.id}
@@ -303,7 +329,7 @@ export default function Workspace() {
 
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
@@ -343,7 +369,7 @@ function FileCard({ file, isMenuOpen, onToggleMenu, onOpen }) {
               e.stopPropagation()
               onToggleMenu()
             }}
-            className="rounded p-1 text-gray-500 hover:bg-gray-300"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 hover:bg-gray-300 md:h-auto md:w-auto md:rounded md:p-1"
           >
             <MoreVertical size={14} />
           </button>
@@ -411,6 +437,7 @@ function Lightbox({ files, index, client, onClose, onNavigate }) {
   const file = files[index]
   const name = file.name ?? file.filename ?? 'Untitled'
   const botName = BOT_NAMES[client.bot_assigned] ?? 'Fundi'
+  const { setHideBottomNav } = useMobileChrome()
 
   const [approved, setApproved] = useState(false)
   const [approving, setApproving] = useState(false)
@@ -487,6 +514,12 @@ function Lightbox({ files, index, client, onClose, onNavigate }) {
   }, [])
 
   useEffect(() => {
+    setHideBottomNav(true)
+    return () => setHideBottomNav(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
     if (!dragging) return
 
     function handleMove(e) {
@@ -516,15 +549,17 @@ function Lightbox({ files, index, client, onClose, onNavigate }) {
       })
     }
 
-    window.addEventListener('mousemove', handleMove)
-    window.addEventListener('mouseup', handleUp)
+    window.addEventListener('pointermove', handleMove)
+    window.addEventListener('pointerup', handleUp)
+    window.addEventListener('pointercancel', handleUp)
     return () => {
-      window.removeEventListener('mousemove', handleMove)
-      window.removeEventListener('mouseup', handleUp)
+      window.removeEventListener('pointermove', handleMove)
+      window.removeEventListener('pointerup', handleUp)
+      window.removeEventListener('pointercancel', handleUp)
     }
   }, [dragging])
 
-  function handleImageMouseDown(e) {
+  function handleImagePointerDown(e) {
     if (!imageRef.current) return
     e.preventDefault()
     const point = getRelativePercent(e, imageRef.current)
@@ -644,7 +679,7 @@ function Lightbox({ files, index, client, onClose, onNavigate }) {
         type="button"
         onClick={onClose}
         aria-label="Close"
-        className="absolute right-6 top-6 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+        className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 md:right-6 md:top-6 md:h-9 md:w-9"
       >
         <X size={20} />
       </button>
@@ -657,7 +692,7 @@ function Lightbox({ files, index, client, onClose, onNavigate }) {
             onNavigate(index - 1)
           }}
           aria-label="Previous file"
-          className="absolute left-6 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-fundi-dark text-white transition hover:bg-fundi-dark/80"
+          className="absolute left-3 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-fundi-dark text-white transition hover:bg-fundi-dark/80 md:left-6 md:h-10 md:w-10"
         >
           <ChevronLeft size={22} />
         </button>
@@ -671,7 +706,7 @@ function Lightbox({ files, index, client, onClose, onNavigate }) {
             onNavigate(index + 1)
           }}
           aria-label="Next file"
-          className="absolute right-6 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-fundi-dark text-white transition hover:bg-fundi-dark/80"
+          className="absolute right-3 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-fundi-dark text-white transition hover:bg-fundi-dark/80 md:right-6 md:h-10 md:w-10"
         >
           <ChevronRight size={22} />
         </button>
@@ -685,9 +720,9 @@ function Lightbox({ files, index, client, onClose, onNavigate }) {
           ref={imageRef}
           src={`/api/image?fileId=${file.id}`}
           alt={name}
-          onMouseDown={handleImageMouseDown}
+          onPointerDown={handleImagePointerDown}
           className="max-h-[85vh] max-w-full select-none rounded-lg object-contain"
-          style={{ cursor: 'crosshair' }}
+          style={{ cursor: 'crosshair', touchAction: dragging ? 'none' : 'auto' }}
           draggable={false}
         />
 

@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Paperclip, Send, Calendar, BarChart2 } from 'lucide-react'
 import { useClient } from '../context/ClientContext'
+import { useMobileChrome } from '../context/MobileChromeContext'
 import { supabase } from '../lib/supabase'
 import { BOTS } from '../lib/bots'
 import { ASSISTANT_MARKDOWN_CLASSES } from '../lib/markdownBubble'
@@ -24,6 +25,7 @@ function makeLocalId() {
 
 export default function Chat() {
   const { client, fundiFileText } = useClient()
+  const { setHeader, setHideBottomNav } = useMobileChrome()
   const navigate = useNavigate()
   const { botId } = useParams()
 
@@ -346,6 +348,29 @@ export default function Chat() {
   }, [selectedSessionId])
 
   useEffect(() => {
+    if (!selectedSessionId) {
+      setHideBottomNav(false)
+      setHeader(null)
+      return
+    }
+    const info = BOTS[botId]
+    setHideBottomNav(true)
+    setHeader({
+      onBack: () => setSelectedSessionId(null),
+      avatarLabel: (info?.name ?? 'F').charAt(0),
+      title: info?.name ?? 'Fundi',
+    })
+  }, [selectedSessionId, botId, setHeader, setHideBottomNav])
+
+  useEffect(() => {
+    return () => {
+      setHideBottomNav(false)
+      setHeader(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
     let cancelled = false
 
     async function loadInstructions() {
@@ -417,7 +442,9 @@ export default function Chat() {
 
   return (
     <div className="flex h-full gap-6 overflow-hidden font-sans">
-      <div className="hidden h-full w-72 flex-shrink-0 flex-col gap-4 md:flex">
+      <div
+        className={`${selectedSessionId ? 'hidden' : 'flex'} h-full w-72 flex-shrink-0 flex-col gap-4 md:flex`}
+      >
         <AgentCard bot={botId} />
 
         <h2 className="text-sm font-semibold text-fundi-dark/70">
@@ -484,7 +511,9 @@ export default function Chat() {
         </button>
       </div>
 
-      <div className="flex h-full flex-1 flex-col overflow-hidden">
+      <div
+        className={`${selectedSessionId ? 'flex' : 'hidden'} h-full flex-1 flex-col overflow-hidden md:flex`}
+      >
         {!selectedSessionId ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8 text-center">
             <h1 className="text-2xl font-semibold text-fundi-dark">

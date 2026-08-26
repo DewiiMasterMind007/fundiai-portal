@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { useClient } from './context/ClientContext'
+import { MobileChromeProvider, useMobileChrome } from './context/MobileChromeContext'
 import Sidebar from './components/Sidebar'
 import MobileTopBar from './components/MobileTopBar'
 import MobileBottomNav from './components/MobileBottomNav'
@@ -61,13 +62,27 @@ function AppShell() {
   }
 
   return (
+    <MobileChromeProvider>
+      <AppShellLayout />
+    </MobileChromeProvider>
+  )
+}
+
+function AppShellLayout() {
+  const { hideBottomNav } = useMobileChrome()
+
+  return (
     <div className="flex h-screen flex-col bg-fundi-dark md:flex-row">
       <div className="hidden md:block">
         <Sidebar />
       </div>
       <MobileTopBar />
       <div className="min-h-0 flex-1 bg-fundi-bg md:rounded-l-3xl md:p-6">
-        <div className="h-full overflow-auto bg-white p-4 pb-20 shadow-sm md:rounded-2xl md:p-6 md:pb-6">
+        <div
+          className={`h-full overflow-auto bg-white p-4 shadow-sm md:rounded-2xl md:p-6 md:pb-6 ${
+            hideBottomNav ? 'pb-4' : 'pb-20'
+          }`}
+        >
           <Outlet />
         </div>
       </div>
