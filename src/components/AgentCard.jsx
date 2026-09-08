@@ -9,7 +9,7 @@ export default function AgentCard({ bot }) {
   }
 
   return (
-    <div className="relative h-56 overflow-hidden rounded-2xl bg-gradient-to-br from-fundi-blue to-fundi-dark p-6 font-sans text-white shadow-lg">
+    <div className="relative h-56 overflow-visible rounded-2xl bg-gradient-to-br from-fundi-blue to-fundi-dark p-6 font-sans text-white shadow-lg">
       <button
         type="button"
         aria-label="More info"
@@ -25,7 +25,7 @@ export default function AgentCard({ bot }) {
         <img
           src={agent.image}
           alt={agent.name}
-          className="pointer-events-none absolute -bottom-3 -right-4 h-48 w-48 object-contain"
+          className="pointer-events-none absolute -top-3 -right-6 h-52 w-52 object-contain object-bottom"
         />
       )}
     </div>

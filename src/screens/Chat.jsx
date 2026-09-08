@@ -457,7 +457,7 @@ export default function Chat() {
           </div>
         )}
 
-        <div className="flex-1 space-y-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
           {sessions.map((session) => (
             <button
               key={session.id}
@@ -481,12 +481,12 @@ export default function Chat() {
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-shrink-0 items-center justify-center gap-3 md:grid md:grid-cols-2">
           <button
             type="button"
             onClick={() => navigate('/schedule')}
             aria-label="Content schedule"
-            className="flex aspect-square items-center justify-center rounded-2xl border-2 border-fundi-blue bg-white text-fundi-blue transition hover:bg-fundi-bg"
+            className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl border-2 border-fundi-blue bg-white text-fundi-blue transition hover:bg-fundi-bg md:aspect-square md:h-auto md:w-auto"
           >
             <Calendar size={22} />
           </button>
@@ -495,7 +495,7 @@ export default function Chat() {
             disabled
             aria-label="Insights (coming soon)"
             title="Coming soon"
-            className="flex aspect-square items-center justify-center rounded-2xl border-2 border-gray-200 bg-white text-gray-300"
+            className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl border-2 border-gray-200 bg-white text-gray-300 md:aspect-square md:h-auto md:w-auto"
             style={{ cursor: 'not-allowed' }}
           >
             <BarChart2 size={22} />

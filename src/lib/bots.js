@@ -2,7 +2,7 @@ export const BOTS = {
   poppie: {
     name: 'Poppie',
     role: 'Social Media Fundi',
-    image: '/Poppie.png',
+    image: '/Poppie%20Profile%20Transparent.png',
     color: 'var(--fundi-blue)',
   },
   chad: {
