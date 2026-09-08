@@ -23,6 +23,7 @@ import {
   Check,
   AlertTriangle,
   Lock,
+  MessageSquarePlus,
 } from 'lucide-react'
 import { useClient } from '../context/ClientContext'
 import { useMobileChrome } from '../context/MobileChromeContext'
@@ -160,7 +161,7 @@ function BotAvatar({ botName }) {
   )
 }
 
-function DayPostsPanel({ date, posts, onSelectPost }) {
+function DayPostsPanel({ date, posts, onSelectPost, onClose }) {
   let formattedDate
   try {
     formattedDate = format(parseISO(date), 'EEEE, d MMMM yyyy')
@@ -170,9 +171,19 @@ function DayPostsPanel({ date, posts, onSelectPost }) {
 
   return (
     <div className="mt-3 rounded-xl border border-gray-200 bg-white p-3 md:hidden">
-      <h3 className="mb-2 text-sm font-semibold text-fundi-dark">
-        {formattedDate}
-      </h3>
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <h3 className="text-sm font-semibold text-fundi-dark">
+          {formattedDate}
+        </h3>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-fundi-bg"
+        >
+          <X size={16} />
+        </button>
+      </div>
       {posts.length === 0 ? (
         <p className="text-xs text-gray-400">No posts scheduled yet</p>
       ) : (
@@ -481,6 +492,7 @@ function ScheduleContent() {
           date={selectedDay}
           posts={filteredPosts.filter((post) => post.date === selectedDay)}
           onSelectPost={(post) => setModalPost(post)}
+          onClose={() => setSelectedDay(null)}
         />
       )}
 
@@ -526,6 +538,7 @@ function PostModal({ post, platform, client, onClose, onApproved }) {
 
   // Image region comments
   const [submittedRegions, setSubmittedRegions] = useState([])
+  const [selectionMode, setSelectionMode] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [draftRegion, setDraftRegion] = useState(null)
   const [cardMode, setCardMode] = useState(null) // 'form' | 'sending' | null
@@ -635,7 +648,7 @@ function PostModal({ post, platform, client, onClose, onApproved }) {
   }, [dragging])
 
   function handleImagePointerDown(e) {
-    if (!imageRef.current || isLocked) return
+    if (!imageRef.current || isLocked || !selectionMode) return
     e.preventDefault()
     const point = getRelativePercent(e, imageRef.current)
     dragStartRef.current = point
@@ -651,6 +664,7 @@ function PostModal({ post, platform, client, onClose, onApproved }) {
     setCardMode(null)
     setCommentText('')
     setSubmitError(null)
+    setSelectionMode(false)
   }
 
   async function postTicket(summary) {
@@ -741,6 +755,7 @@ function PostModal({ post, platform, client, onClose, onApproved }) {
       setDraftRegion(null)
       setCardMode(null)
       setCommentText('')
+      setSelectionMode(false)
     } catch (err) {
       setSubmitError(err.message)
       setCardMode('form')
@@ -956,6 +971,21 @@ function PostModal({ post, platform, client, onClose, onApproved }) {
           <div className="relative">
             {hasImage ? (
               <>
+                {!isLocked && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectionMode((v) => !v)}
+                    aria-label="Comment on this image"
+                    aria-pressed={selectionMode}
+                    className={`absolute right-2 top-2 z-10 flex h-11 w-11 items-center justify-center rounded-full shadow-lg transition ${
+                      selectionMode
+                        ? 'bg-fundi-blue text-white'
+                        : 'bg-white text-fundi-dark hover:bg-fundi-blue hover:text-white'
+                    }`}
+                  >
+                    <MessageSquarePlus size={18} />
+                  </button>
+                )}
                 <img
                   ref={imageRef}
                   src={post.image_url}
@@ -964,8 +994,8 @@ function PostModal({ post, platform, client, onClose, onApproved }) {
                   onPointerDown={handleImagePointerDown}
                   className="h-full w-full select-none rounded-lg object-cover"
                   style={{
-                    cursor: isLocked ? 'default' : 'crosshair',
-                    touchAction: dragging ? 'none' : 'auto',
+                    cursor: isLocked ? 'default' : selectionMode ? 'crosshair' : 'default',
+                    touchAction: selectionMode ? 'none' : 'auto',
                   }}
                   draggable={false}
                 />

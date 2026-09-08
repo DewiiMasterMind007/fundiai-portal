@@ -3,6 +3,12 @@ import { supabase } from '../lib/supabase'
 
 const AdminContext = createContext(undefined)
 
+function purgeStaleSupabaseKeys() {
+  Object.keys(localStorage)
+    .filter((key) => key.startsWith('sb-'))
+    .forEach((key) => localStorage.removeItem(key))
+}
+
 export function AdminProvider({ children }) {
   const [admin, setAdmin] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -47,8 +53,34 @@ export function AdminProvider({ children }) {
     }
   }, [])
 
+  const signOut = async () => {
+    // Same reasoning as ClientContext's signOut: flip local state
+    // immediately rather than waiting on the SIGNED_OUT event or on
+    // supabase.auth.signOut() itself, and force a redirect if it hasn't
+    // resolved after a few seconds, so a stuck in-flight request can't
+    // leave an admin staring at a loading screen forever.
+    setAdmin(null)
+    setLoading(false)
+
+    let signedOut = false
+    const forceRedirectTimer = setTimeout(() => {
+      if (signedOut) return
+      purgeStaleSupabaseKeys()
+      window.location.assign('/login')
+    }, 5000)
+
+    try {
+      await supabase.auth.signOut()
+    } finally {
+      signedOut = true
+      clearTimeout(forceRedirectTimer)
+    }
+
+    purgeStaleSupabaseKeys()
+  }
+
   return (
-    <AdminContext.Provider value={{ admin, loading }}>
+    <AdminContext.Provider value={{ admin, loading, signOut }}>
       {children}
     </AdminContext.Provider>
   )

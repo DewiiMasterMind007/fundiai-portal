@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { LayoutDashboard, Users, Ticket, Calendar, LogOut } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { useAdmin } from '../context/AdminContext'
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
@@ -11,6 +11,7 @@ const navItems = [
 
 export default function AdminSidebar() {
   const location = useLocation()
+  const { signOut } = useAdmin()
 
   return (
     <nav className="flex h-full w-20 flex-col items-center bg-fundi-dark py-6 font-sans">
@@ -43,7 +44,7 @@ export default function AdminSidebar() {
 
       <button
         type="button"
-        onClick={() => supabase.auth.signOut()}
+        onClick={signOut}
         aria-label="Log out"
         className="mb-3 mt-6 flex h-9 w-9 items-center justify-center rounded-xl text-white/60 transition hover:bg-white/10 hover:text-white"
       >

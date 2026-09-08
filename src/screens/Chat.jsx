@@ -512,7 +512,7 @@ export default function Chat() {
       </div>
 
       <div
-        className={`${selectedSessionId ? 'flex' : 'hidden'} h-full flex-1 flex-col overflow-hidden md:flex`}
+        className={`${selectedSessionId ? 'flex' : 'hidden'} h-full min-h-0 w-full flex-1 flex-col overflow-hidden md:flex`}
       >
         {!selectedSessionId ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8 text-center">
@@ -530,7 +530,7 @@ export default function Chat() {
           </div>
         ) : (
           <>
-            <div className="flex-1 space-y-4 overflow-y-auto px-2 py-4">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-2 py-4">
               {messagesLoading && (
                 <p className="text-center text-sm text-gray-400">
                   Loading messages...

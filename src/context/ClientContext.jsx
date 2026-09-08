@@ -8,6 +8,12 @@ function isSettingPassword() {
   return sessionStorage.getItem(SETTING_PASSWORD_FLAG_KEY) === 'true'
 }
 
+function purgeStaleSupabaseKeys() {
+  Object.keys(localStorage)
+    .filter((key) => key.startsWith('sb-'))
+    .forEach((key) => localStorage.removeItem(key))
+}
+
 // Events that hand us a session we should actually (re)load client data
 // for. TOKEN_REFRESHED is deliberately NOT included — see the comment
 // where it's handled below.
@@ -149,12 +155,47 @@ export function ClientProvider({ children }) {
   }, [])
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    // Bump the token first so any load already in flight (e.g. the
+    // client-row fetch or fundifile fetch kicked off just before the
+    // user hit logout) can't land after this and either repopulate
+    // `client`/`session` or hit its own `signOut()`-on-failure path —
+    // its `if (loadTokenRef.current !== token) return` guards (in both
+    // the try and catch branches) now all short-circuit.
+    loadTokenRef.current += 1
+    setSession(null)
+    setClient(null)
+    setFundiFileText('')
+    setError(null)
+    // Flip this synchronously too, rather than waiting on the SIGNED_OUT
+    // auth event to do it — if supabase.auth.signOut() below ends up
+    // stuck behind an in-flight request's auth lock (or that request
+    // never settles at all), the event may never fire, and AppShell's
+    // `if (loading) return <Loading />` would otherwise spin forever
+    // instead of falling through to its `!session` redirect.
+    setLoading(false)
+
+    let signedOut = false
+    const forceRedirectTimer = setTimeout(() => {
+      if (signedOut) return
+      // Safety net: supabase.auth.signOut() hasn't resolved within a few
+      // seconds. Local state above already reflects "logged out", but
+      // clear the stored session token too and hard-navigate, in case
+      // whatever is stuck is also blocking a normal render from reaching
+      // the login screen.
+      purgeStaleSupabaseKeys()
+      window.location.assign('/login')
+    }, 5000)
+
+    try {
+      await supabase.auth.signOut()
+    } finally {
+      signedOut = true
+      clearTimeout(forceRedirectTimer)
+    }
+
     // Safety net: guarantee no stale Supabase session data can leak into a
     // subsequent login or recovery flow in this browser.
-    Object.keys(localStorage)
-      .filter((key) => key.startsWith('sb-'))
-      .forEach((key) => localStorage.removeItem(key))
+    purgeStaleSupabaseKeys()
   }
 
   const value = { session, client, fundiFileText, loading, error, signOut }

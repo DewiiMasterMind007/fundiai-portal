@@ -15,3 +15,17 @@
   --fundi-bg: #F1F2F4;
   --fundi-gradient: linear-gradient(135deg, var(--fundi-blue), var(--fundi-dark));
 }
+
+@layer utilities {
+  /* Some mobile browsers/WKWebViews don't parse `100dvh` at all, which
+     drops the declaration entirely rather than falling back to `vh` —
+     that leaves the element with no computed height, so it collapses to
+     fit its content instead of filling the screen. Declaring `vh` first
+     in the SAME rule guarantees a real fallback: browsers that don't
+     understand the `dvh` line simply ignore it and keep the `vh` value;
+     browsers that do understand it get the more accurate dynamic value. */
+  .h-screen-safe {
+    height: 100vh;
+    height: 100dvh;
+  }
+}

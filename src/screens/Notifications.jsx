@@ -400,9 +400,9 @@ export default function Notifications() {
       </div>
 
       <div
-        className={`${selectedBotId ? 'flex' : 'hidden'} h-full flex-1 flex-col overflow-hidden md:flex`}
+        className={`${selectedBotId ? 'flex' : 'hidden'} h-full min-h-0 w-full flex-1 flex-col overflow-hidden md:flex`}
       >
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex flex-shrink-0 items-center justify-between">
           <div>
             {selectedBot && (
               <>
@@ -423,7 +423,7 @@ export default function Notifications() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {error ? (
             <div className="rounded-xl bg-red-50 p-4 text-sm text-red-600">
               {error}

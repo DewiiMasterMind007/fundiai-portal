@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ThumbsUp,
+  MessageSquarePlus,
   Check,
 } from 'lucide-react'
 import { useClient } from '../context/ClientContext'
@@ -444,6 +445,7 @@ function Lightbox({ files, index, client, onClose, onNavigate }) {
   const [justConfirmed, setJustConfirmed] = useState(false)
   const [approveError, setApproveError] = useState(null)
 
+  const [selectionMode, setSelectionMode] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [draftRegion, setDraftRegion] = useState(null)
   const [cardMode, setCardMode] = useState(null) // 'form' | 'sending' | null
@@ -560,7 +562,7 @@ function Lightbox({ files, index, client, onClose, onNavigate }) {
   }, [dragging])
 
   function handleImagePointerDown(e) {
-    if (!imageRef.current) return
+    if (!imageRef.current || !selectionMode) return
     e.preventDefault()
     const point = getRelativePercent(e, imageRef.current)
     dragStartRef.current = point
@@ -603,6 +605,7 @@ function Lightbox({ files, index, client, onClose, onNavigate }) {
     setCardMode(null)
     setCommentText('')
     setSubmitError(null)
+    setSelectionMode(false)
   }
 
   async function handleSubmitComment() {
@@ -656,6 +659,7 @@ function Lightbox({ files, index, client, onClose, onNavigate }) {
       setDraftRegion(null)
       setCardMode(null)
       setCommentText('')
+      setSelectionMode(false)
     } catch (err) {
       setSubmitError(err.message)
       setCardMode('form')
@@ -722,7 +726,10 @@ function Lightbox({ files, index, client, onClose, onNavigate }) {
           alt={name}
           onPointerDown={handleImagePointerDown}
           className="max-h-[85vh] max-w-full select-none rounded-lg object-contain"
-          style={{ cursor: 'crosshair', touchAction: dragging ? 'none' : 'auto' }}
+          style={{
+            cursor: selectionMode ? 'crosshair' : 'default',
+            touchAction: selectionMode ? 'none' : 'auto',
+          }}
           draggable={false}
         />
 
@@ -761,23 +768,38 @@ function Lightbox({ files, index, client, onClose, onNavigate }) {
         )}
 
         <div className="absolute right-4 top-4 flex flex-col items-end gap-1">
-          <button
-            type="button"
-            onClick={handleApprove}
-            disabled={approving || approved}
-            aria-label="Approve file"
-            className={`flex h-11 w-11 items-center justify-center rounded-full shadow-lg transition ${
-              approved
-                ? 'bg-fundi-green text-white'
-                : 'bg-white text-fundi-dark hover:bg-fundi-green hover:text-white'
-            }`}
-          >
-            {justConfirmed ? (
-              <Check size={20} />
-            ) : (
-              <ThumbsUp size={18} fill={approved ? 'currentColor' : 'none'} />
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectionMode((v) => !v)}
+              aria-label="Comment on this image"
+              aria-pressed={selectionMode}
+              className={`flex h-11 w-11 items-center justify-center rounded-full shadow-lg transition ${
+                selectionMode
+                  ? 'bg-fundi-blue text-white'
+                  : 'bg-white text-fundi-dark hover:bg-fundi-blue hover:text-white'
+              }`}
+            >
+              <MessageSquarePlus size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={handleApprove}
+              disabled={approving || approved}
+              aria-label="Approve file"
+              className={`flex h-11 w-11 items-center justify-center rounded-full shadow-lg transition ${
+                approved
+                  ? 'bg-fundi-green text-white'
+                  : 'bg-white text-fundi-dark hover:bg-fundi-green hover:text-white'
+              }`}
+            >
+              {justConfirmed ? (
+                <Check size={20} />
+              ) : (
+                <ThumbsUp size={18} fill={approved ? 'currentColor' : 'none'} />
+              )}
+            </button>
+          </div>
           {approveError && (
             <div className="max-w-[200px] rounded-lg bg-red-50 px-2 py-1 text-right text-xs text-red-600">
               {approveError}

@@ -72,7 +72,7 @@ function AppShellLayout() {
   const { hideBottomNav } = useMobileChrome()
 
   return (
-    <div className="flex h-screen flex-col bg-fundi-dark md:flex-row">
+    <div className="flex h-screen-safe flex-col bg-fundi-dark md:flex-row">
       <div className="hidden md:block">
         <Sidebar />
       </div>
